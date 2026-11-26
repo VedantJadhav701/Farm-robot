@@ -1,0 +1,47 @@
+{
+  "onnx_cpu_benchmark": {
+    "provider": "CPUExecutionProvider",
+    "avg_ms": 89.08,
+    "fps": 11.2,
+    "output_shape": [
+      1,
+      5,
+      8400
+    ],
+    "max_raw_conf": 0.8442
+  },
+  "depth_3d_samples": [
+    {
+      "image": "106.jpg",
+      "yolo_ms": 14.2,
+      "depth_ms": 1160.2,
+      "total_3d_ms": 1174.4,
+      "trunk_base_px": [
+        169,
+        759
+      ],
+      "target_3d_m": [
+        -0.869,
+        1.564,
+        -0.241
+      ],
+      "confidence": 0.8577
+    },
+    {
+      "image": "110.jpg",
+      "yolo_ms": 14.1,
+      "depth_ms": 1071.7,
+      "total_3d_ms": 1085.8,
+      "trunk_base_px": [
+        965,
+        766
+      ],
+      "target_3d_m": [
+        0.004,
+        1.192,
+        -0.189
+      ],
+      "confidence": 0.8859
+    }
+  ]
+}

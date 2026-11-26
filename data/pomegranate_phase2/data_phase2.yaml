@@ -1,0 +1,10 @@
+path: C:/Users/HP/projects/physical-ai-robotics-venture/data/pomegranate_phase2
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 3
+names:
+  0: pomegranate_fruit
+  1: trunk_base
+  2: weed_cluster

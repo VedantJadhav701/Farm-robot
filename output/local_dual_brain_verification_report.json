@@ -1,0 +1,89 @@
+{
+  "system1_backend": "yolo",
+  "system1_device": "0",
+  "system2_backend": "rule_fallback",
+  "system2_model": "qwen2.5:3b",
+  "intent_parse_ms": 2.6,
+  "positive_samples": [
+    {
+      "image": "106.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8577,
+      "num_detections": 2,
+      "system1_ms": 165.8,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 85.8% confidence. Dispensing 80.0 mL over 0.320s."
+    },
+    {
+      "image": "106_contrast0.6.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8686,
+      "num_detections": 2,
+      "system1_ms": 12.4,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 86.9% confidence. Dispensing 80.0 mL over 0.320s."
+    },
+    {
+      "image": "106_contrast1.4.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8543,
+      "num_detections": 2,
+      "system1_ms": 18.2,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 85.4% confidence. Dispensing 80.0 mL over 0.320s."
+    },
+    {
+      "image": "110.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8859,
+      "num_detections": 2,
+      "system1_ms": 19.3,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 88.6% confidence. Dispensing 80.0 mL over 0.320s."
+    },
+    {
+      "image": "110_contrast0.6.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8826,
+      "num_detections": 2,
+      "system1_ms": 18.2,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 88.3% confidence. Dispensing 80.0 mL over 0.320s."
+    },
+    {
+      "image": "110_contrast1.4.jpg",
+      "is_pomegranate": true,
+      "confidence": 0.8852,
+      "num_detections": 2,
+      "system1_ms": 11.1,
+      "system2_ms": 0.0,
+      "authorized": true,
+      "dose_ml": 80.0,
+      "reasoning": "AUTHORIZED: Verified Pomegranate (Punica granatum) with 88.5% confidence. Dispensing 80.0 mL over 0.320s."
+    }
+  ],
+  "negative_samples": [
+    {
+      "image": "bare_soil_control.jpg",
+      "is_pomegranate": false,
+      "confidence": 0.0,
+      "num_detections": 0,
+      "system1_ms": 11.7,
+      "system2_ms": 0.0,
+      "authorized": false,
+      "reasoning": "ABORTED: Target is not confirmed as pomegranate. Detected: 'Unverified Crop'."
+    }
+  ],
+  "avg_system1_ms": 40.8,
+  "avg_system1_fps": 24.5
+}

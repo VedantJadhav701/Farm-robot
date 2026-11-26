@@ -1,0 +1,19 @@
+# ═══════════════════════════════════════════════════════════
+# Pomegranate Agricultural Detection Dataset
+# Used by: System 1 CNN (YOLOv8) of the Dual-Brain Architecture
+# Re-generated automatically by download_dataset.py
+# ═══════════════════════════════════════════════════════════
+
+path: data/pomegranate_dataset
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 6
+names:
+  0: pomegranate_fruit
+  1: pomegranate_flower
+  2: pomegranate_tree
+  3: trunk_base
+  4: weed_cluster
+  5: soil

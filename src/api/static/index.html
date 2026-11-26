@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Physical AI — Pomegranate Dual-Brain Cockpit</title>
+  <style>
+    :root {
+      --bg: #0b0f14; --card: #131a22; --border: #233040;
+      --accent: #00e676; --cyan: #00d8ff; --danger: #ff5252;
+      --text: #e6edf3; --muted: #8b9bb0;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 14px; margin-bottom: 20px; }
+    .header h1 { margin: 0; font-size: 20px; letter-spacing: 0.4px; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #102a1d; color: var(--accent); border: 1px solid #1f5c3a; }
+    .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .card h2 { margin: 0 0 12px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    input[type="text"] { flex: 1; background: #0d131a; border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+    button { background: var(--accent); color: #062111; border: none; padding: 10px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; }
+    button.sec { background: #1b2531; color: var(--text); border: 1px solid var(--border); }
+    button.mic { background: #1f2b38; color: var(--cyan); border: 1px solid #2b445e; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .view-box { background: #090d12; border: 1px solid var(--border); border-radius: 8px; min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 6px; }
+    .view-box img { width: 100%; border-radius: 6px; display: block; }
+    .view-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; align-self: flex-start; }
+    .status-pill { display: inline-block; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+    .ok { background: #102d1d; color: var(--accent); border: 1px solid #1e6b3f; }
+    .abort { background: #331317; color: var(--danger); border: 1px solid #75242c; }
+    .kv { display: grid; grid-template-columns: 150px 1fr; gap: 6px 10px; font-size: 13px; margin-top: 10px; }
+    .kv .k { color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .samples { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>PHYSICAL AI — POMEGRANATE DUAL-BRAIN COCKPIT</h1>
+      <div id="sysHealth" style="font-size:12px;color:var(--muted);margin-top:4px;">Connecting to Dual-Brain...</div>
+    </div>
+    <span class="badge" id="statusBadge">SYSTEM READY</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card" style="margin-bottom:18px;">
+        <h2>1. System 2 Operator Command (Text / Voice)</h2>
+        <div class="row">
+          <input id="cmdInput" type="text" value="Apply 80 mL of bio-fertilizer to the pomegranate base." />
+          <button class="mic" onclick="startVoice()">🎙 Speak</button>
+          <button onclick="sendCommand()">Set Intent</button>
+        </div>
+        <div id="intentOut" style="font-size:12px;color:var(--cyan);margin-top:8px;">Active Intent: 80.0 mL | min_conf >= 0.80</div>
+      </div>
+
+      <div class="card">
+        <h2>2. System 1 (YOLOv8s) + 3D Depth Perception</h2>
+        <div class="row">
+          <input id="fileInput" type="file" accept="image/*" style="font-size:13px;" />
+          <button onclick="inspectUpload()">Inspect &amp; Authorize</button>
+        </div>
+        <div class="samples" id="sampleBtns"></div>
+        <div class="views">
+          <div class="view-box">
+            <div class="view-label">System 1: YOLOv8s Detections + Pour Target</div>
+            <img id="rgbPreview" alt="Upload or select an orchard image" />
+          </div>
+          <div class="view-box">
+            <div class="view-label">3D Lifting: Depth-Anything-V2-Small INT8</div>
+            <img id="depthPreview" alt="Depth heatmap appears after inspection" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:18px;">
+        <h2>3. Dual-Brain Decision &amp; 6-DOF IK</h2>
+        <div id="decisionPill" class="status-pill ok">AWAITING FRAME</div>
+        <div class="kv" id="telemetryKv">
+          <div class="k">Crop Verified</div><div id="tCrop">—</div>
+          <div class="k">Confidence</div><div id="tConf">—</div>
+          <div class="k">3D Target (X,Y,Z)</div><div id="tXyz">—</div>
+          <div class="k">Latency (S1 / Depth)</div><div id="tLat">—</div>
+          <div class="k">Dose / Valve Pulse</div><div id="tDose">—</div>
+          <div class="k">6-DOF IK (rad)</div><div id="tIk" style="font-family:monospace;font-size:12px;">—</div>
+          <div class="k">SLM Reasoning</div><div id="tReason">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>4. Solenoid Dosing Audit Log (SQLite)</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Crop</th><th>Conf</th><th>Dose</th><th>3D (m)</th><th>Status</th></tr></thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadHealth() {
+      const r = await fetch('/health');
+      const d = await r.json();
+      document.getElementById('sysHealth').textContent =
+        `S1: ${d.system1_backend} (GPU ${d.system1_device}) | S2: ${d.system2_backend} (${d.system2_model}) | Depth: ${d.depth_model}`;
+    }
+
+    async function loadSamples() {
+      const r = await fetch('/sample-images');
+      const d = await r.json();
+      const box = document.getElementById('sampleBtns');
+      box.innerHTML = '<span style="font-size:12px;color:var(--muted);margin-right:4px;">Quick Samples:</span>';
+      for (const s of d.samples) {
+        const b = document.createElement('button');
+        b.className = 'sec';
+        b.textContent = s.label;
+        b.onclick = () => inspectSample(s.path, s.label);
+        box.appendChild(b);
+      }
+    }
+
+    async function loadAudit() {
+      const r = await fetch('/audit-log?limit=6');
+      const d = await r.json();
+      const tb = document.getElementById('auditBody');
+      tb.innerHTML = d.records.map(x =>
+        `<tr><td>#${x.id}</td><td>${x.crop_species.split(' ')[0]}</td><td>${(x.confidence*100).toFixed(1)}%</td><td>${x.dose_ml} mL</td><td>(${x.target_x}, ${x.target_y}, ${x.target_z})</td><td>${x.status}</td></tr>`
+      ).join('');
+    }
+
+    async function sendCommand() {
+      const text = document.getElementById('cmdInput').value;
+      const r = await fetch('/command', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command_text: text})
+      });
+      const d = await r.json();
+      document.getElementById('intentOut').textContent =
+        `Active Intent: ${d.intent.dose_volume_ml} mL | target=${d.intent.target_crop} | min_conf=${d.intent.min_confidence}`;
+    }
+
+    function startVoice() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { alert('Web Speech API not supported in this browser.'); return; }
+      const rec = new SR();
+      rec.lang = 'en-IN';
+      rec.onresult = (e) => {
+        document.getElementById('cmdInput').value = e.results[0][0].transcript;
+        sendCommand();
+      };
+      rec.start();
+    }
+
+    async function inspectUpload() {
+      const fi = document.getElementById('fileInput');
+      if (!fi.files.length) { alert('Select an image first.'); return; }
+      const fd = new FormData();
+      fd.append('file', fi.files[0]);
+      fd.append('include_images', 'true');
+      await runInspection(fd);
+    }
+
+    async function inspectSample(path, name) {
+      const blob = await (await fetch('/sample-file?path=' + encodeURIComponent(path))).blob();
+      const fd = new FormData();
+      fd.append('file', blob, name);
+      fd.append('include_images', 'true');
+      await runInspection(fd);
+    }
+
+    async function runInspection(fd) {
+      document.getElementById('statusBadge').textContent = 'RUNNING...';
+      const r = await fetch('/inspect-and-authorize', {method: 'POST', body: fd});
+      const d = await r.json();
+      document.getElementById('statusBadge').textContent = 'SYSTEM READY';
+
+      if (d.annotated_rgb_b64) document.getElementById('rgbPreview').src = 'data:image/jpeg;base64,' + d.annotated_rgb_b64;
+      if (d.depth_heatmap_b64) document.getElementById('depthPreview').src = 'data:image/jpeg;base64,' + d.depth_heatmap_b64;
+      else document.getElementById('depthPreview').removeAttribute('src');
+
+      const pill = document.getElementById('decisionPill');
+      pill.textContent = d.decision.authorized ? 'AUTHORIZED & DOSED' : 'ABORTED (SAFETY GATE)';
+      pill.className = 'status-pill ' + (d.decision.authorized ? 'ok' : 'abort');
+
+      document.getElementById('tCrop').textContent = d.vision.is_pomegranate ? 'Pomegranate (Verified)' : 'Unverified / Non-Target';
+      document.getElementById('tConf').textContent = (d.vision.confidence * 100).toFixed(1) + `% (${d.vision.num_detections} boxes)`;
+      document.getElementById('tXyz').textContent = `[${d.vision.target_3d_offset_m.join(', ')}] m`;
+      document.getElementById('tLat').textContent = `${d.vision.system1_ms} ms / ${d.vision.depth_ms} ms`;
+      document.getElementById('tDose').textContent = `${d.decision.dose_volume_ml} mL / ${d.decision.pulse_duration_seconds}s`;
+      document.getElementById('tIk').textContent = d.ik_joint_angles_rad ? `[${d.ik_joint_angles_rad.join(', ')}]` : 'N/A';
+      document.getElementById('tReason').textContent = d.decision.decision_reasoning;
+      loadAudit();
+    }
+
+    loadHealth(); loadSamples(); loadAudit();
+  </script>
+</body>
+</html>
