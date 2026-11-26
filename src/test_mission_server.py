@@ -43,6 +43,39 @@ def main():
     assert pos["decision"]["authorized"] is True
     assert pos["ik_joint_angles_rad"] is not None
     assert len(pos["ik_joint_angles_rad"]) == 6
+    assert pos["safe_abort"] is False
+    assert pos["hardware_frame"]["safety_state"] == "COMPLETED_SAFE"
+    assert pos["hardware_frame"]["retract_verified"] is True
+    assert len(pos["safety_gates"]) == 4
+
+    print("\n=== 3B. FAULT INJECTION TESTS (4-GATE SAFE ABORT) ===")
+    with open(pos_path, "rb") as f:
+        r_tilt = client.post(
+            "/inspect-and-authorize",
+            files={"file": ("110.jpg", f, "image/jpeg")},
+            data={"execute_actuation": "true", "imu_roll_deg": "18.5"},
+        )
+    assert r_tilt.json()["hardware_frame"]["safety_state"] == "SAFE_ABORT_UNSTABLE"
+    assert r_tilt.json()["actuation"] is None
+
+    with open(pos_path, "rb") as f:
+        r_tol = client.post(
+            "/inspect-and-authorize",
+            files={"file": ("110.jpg", f, "image/jpeg")},
+            data={"execute_actuation": "true", "nozzle_error_cm": "9.2"},
+        )
+    assert r_tol.json()["hardware_frame"]["safety_state"] == "SAFE_ABORT_OUT_OF_TOLERANCE"
+    assert r_tol.json()["actuation"] is None
+
+    with open(pos_path, "rb") as f:
+        r_pump = client.post(
+            "/inspect-and-authorize",
+            files={"file": ("110.jpg", f, "image/jpeg")},
+            data={"execute_actuation": "true", "measured_flow_ml": "10.0"},
+        )
+    assert r_pump.json()["hardware_frame"]["safety_state"] == "SAFE_ABORT_PUMP_FAULT"
+    assert r_pump.json()["safe_abort"] is True
+    print("[✓] All 3 hardware fault-injection Safe Aborts passed (IMU tilt, nozzle tolerance, pump fault)!")
 
     print("\n=== 4. /inspect-and-authorize (NEGATIVE: bare_soil_control.jpg) ===")
     neg_path = Path("data/real_test_samples/negative/bare_soil_control.jpg")

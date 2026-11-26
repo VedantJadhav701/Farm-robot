@@ -24,7 +24,7 @@ from src.perception.depth_localizer import MonocularDepthLocalizer
 from src.api.llm_brain import LLMBrainSupervisor, OperatorIntent
 from src.control.kinematics import ArmKinematics
 from src.control.fertilizer_controller import FertilizerDosingController
-from src.hardware.ros2_actuator_bridge import ROS2ActuatorBridge
+from src.hardware.ros2_actuator_bridge import ROS2ActuatorBridge, SafetyTelemetry
 
 app = FastAPI(
     title="Physical AI Pomegranate Dual-Brain API",
@@ -115,6 +115,11 @@ async def inspect_and_authorize(
     execute_actuation: bool = Form(default=True),
     use_depth_3d: bool = Form(default=True),
     include_images: bool = Form(default=False),
+    imu_roll_deg: float = Form(default=0.8),
+    imu_pitch_deg: float = Form(default=-0.5),
+    nozzle_error_cm: float = Form(default=1.4),
+    measured_flow_ml: Optional[float] = Form(default=None),
+    valve_closed_confirmed: bool = Form(default=True),
 ):
     s = get_components()
     raw = await file.read()
@@ -153,17 +158,29 @@ async def inspect_and_authorize(
             "pour_target_3d_m": plan["pour_target_m"],
             "obstacles": obs_info,
         }
-        if execute_actuation:
-            actuation = s["controller"].execute_liquid_dose(decision)
 
-    from dataclasses import asdict
-    hw_frame = asdict(s["hw_bridge"].dispatch(
+    tel = SafetyTelemetry(
+        rover_speed_mps=0.0,
+        imu_roll_deg=imu_roll_deg,
+        imu_pitch_deg=imu_pitch_deg,
+        nozzle_error_cm=nozzle_error_cm,
+        measured_flow_ml=measured_flow_ml,
+        valve_closed_confirmed=valve_closed_confirmed,
+    )
+    actuation_fn = (
+        (lambda: s["controller"].execute_liquid_dose(decision))
+        if (decision.authorized and execute_actuation)
+        else None
+    )
+    bridge_result = s["hw_bridge"].dispatch(
         authorized=decision.authorized,
         dose_volume_ml=decision.dose_volume_ml,
         pulse_duration_s=decision.pulse_duration_seconds,
         arm_plan=arm_plan,
         ik_joints=ik_joints,
-    ))
+        telemetry=tel,
+        actuation_fn=actuation_fn,
+    )
 
     resp = {
         "vision": {
@@ -178,8 +195,10 @@ async def inspect_and_authorize(
         "decision": decision.model_dump(),
         "arm_plan": arm_plan,
         "ik_joint_angles_rad": ik_joints,
-        "hardware_frame": hw_frame,
-        "actuation": actuation,
+        "hardware_frame": bridge_result["frame"],
+        "safety_gates": bridge_result["gates"],
+        "safe_abort": bridge_result["safe_abort"],
+        "actuation": bridge_result["actuation"],
     }
 
     if include_images:
