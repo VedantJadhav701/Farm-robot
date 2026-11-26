@@ -4,6 +4,6 @@
   "frames_processed": 150,
   "pomegranate_detected_frames": 150,
   "autonomous_pour_events": 2,
-  "avg_system1_ms": 35.64,
+  "avg_system1_ms": 39.16,
   "last_strategy": "STANDOFF_ANGLED_JET"
 }

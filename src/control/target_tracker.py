@@ -23,12 +23,14 @@ class RobotVideoState(Enum):
 
 
 class TemporalTargetStabilizer:
-    def __init__(self, ema_alpha: float = 0.22, max_jump_px: float = 80.0):
+    def __init__(self, ema_alpha: float = 0.22, max_jump_px: float = 120.0):
         self.ema_alpha = ema_alpha
         self.max_jump_px = max_jump_px
         self._smoothed_px: Optional[np.ndarray] = None
         self._locked_px: Optional[Tuple[int, int]] = None
         self._miss_streak = 0
+        self._jump_candidate: Optional[np.ndarray] = None
+        self._jump_streak = 0
 
         self.state = RobotVideoState.SCANNING_ROW
         self._hit_streak = 0
@@ -43,23 +45,53 @@ class TemporalTargetStabilizer:
         if self._cooldown_frames > 0:
             self._cooldown_frames -= 1
 
-        # ── 1. Temporal EMA smoothing with outlier-jump damping ──
+        # ── 1. Same-tree EMA smoothing + clean tree-switch gating ──
         raw_arr = np.array(raw_px, dtype=np.float32)
         if detected:
             self._miss_streak = 0
             if self._smoothed_px is None:
                 self._smoothed_px = raw_arr
+                self._jump_candidate = None
+                self._jump_streak = 0
             else:
-                delta = raw_arr - self._smoothed_px
+                ref_arr = (
+                    np.array(self._locked_px, dtype=np.float32)
+                    if self._locked_px is not None
+                    else self._smoothed_px
+                )
+                delta = raw_arr - ref_arr
                 dist = float(np.linalg.norm(delta))
+
                 if dist > self.max_jump_px:
-                    # Clamp sudden single-frame jumps instead of snapping wildly
-                    delta = delta * (self.max_jump_px / dist)
-                self._smoothed_px = self._smoothed_px + self.ema_alpha * delta
+                    # While braking or pouring, ignore distant background trees completely
+                    if self.state in (RobotVideoState.BRAKING_STABILIZE, RobotVideoState.POURING):
+                        pass
+                    else:
+                        # Require 2 consecutive consistent detections before snapping to a new tree
+                        # (never EMA-blend across the dirt alley between left & right rows).
+                        if (
+                            self._jump_candidate is not None
+                            and float(np.linalg.norm(raw_arr - self._jump_candidate)) < 90.0
+                        ):
+                            self._jump_streak += 1
+                        else:
+                            self._jump_candidate = raw_arr
+                            self._jump_streak = 1
+
+                        if self._jump_streak >= 4:
+                            self._smoothed_px = raw_arr
+                            self._jump_candidate = None
+                            self._jump_streak = 0
+                else:
+                    self._jump_candidate = None
+                    self._jump_streak = 0
+                    self._smoothed_px = self._smoothed_px + self.ema_alpha * (raw_arr - self._smoothed_px)
         else:
             self._miss_streak += 1
             if self._miss_streak > 15:
                 self._smoothed_px = None
+                self._jump_candidate = None
+                self._jump_streak = 0
 
         # ── 2. Robot Hysteresis State Machine ─────────────────────
         if self.state == RobotVideoState.SCANNING_ROW:
@@ -75,7 +107,7 @@ class TemporalTargetStabilizer:
                 self._locked_px = (int(self._smoothed_px[0]), int(self._smoothed_px[1]))
 
         elif self.state == RobotVideoState.BRAKING_STABILIZE:
-            # Refine lock gently for 12 frames while rover brakes to 0 m/s
+            # Refine lock gently for 10 frames while rover brakes to 0 m/s
             if self._smoothed_px is not None and self._state_frames <= 10:
                 self._locked_px = (int(self._smoothed_px[0]), int(self._smoothed_px[1]))
             if self._state_frames >= 15:
@@ -83,7 +115,7 @@ class TemporalTargetStabilizer:
                 self._state_frames = 0
 
         elif self.state == RobotVideoState.POURING:
-            # Pour target is FROZEN during active liquid dispensing (~0.4s = 12 frames)
+            # Pour target is FROZEN during active liquid dispensing (~0.4s = 14 frames)
             if self._state_frames >= 14:
                 self.state = RobotVideoState.RETRACT_ADVANCE
                 self._state_frames = 0
@@ -94,6 +126,7 @@ class TemporalTargetStabilizer:
                 self.state = RobotVideoState.SCANNING_ROW
                 self._state_frames = 0
                 self._locked_px = None
+                self._smoothed_px = None
 
         active_px = (
             self._locked_px

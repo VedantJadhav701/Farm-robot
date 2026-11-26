@@ -292,8 +292,17 @@ class PomegranateVisionDetector:
 
         # ── Determine trunk base location ──────────────────
         if trunk_detections:
-            # Use explicit trunk_base detection
-            best_trunk = max(trunk_detections, key=lambda d: d.confidence)
+            # Prefer nearest foreground trunk (bottom y2 >= 0.65*h) over distant
+            # opposite-row trunks across the dirt alley.
+            fg_trunks = [d for d in trunk_detections if d.bbox_xyxy[3] >= h * 0.65]
+            pool = fg_trunks if fg_trunks else trunk_detections
+            candidates = [d for d in pool if d.confidence >= 0.35] or pool
+            best_trunk = max(
+                candidates,
+                key=lambda d: d.confidence
+                * ((d.bbox_xyxy[3] / max(1.0, float(h))) ** 3.0)
+                * (1.0 + min(1.5, d.area_px / max(1.0, w * h * 0.008))),
+            )
             trunk_base_x = best_trunk.bbox_center[0]
             trunk_base_y = best_trunk.bbox_xyxy[3]  # Bottom of trunk bbox
         elif tree_detections:
@@ -303,11 +312,17 @@ class PomegranateVisionDetector:
             trunk_base_x = (x1 + x2) // 2
             trunk_base_y = min(h - 5, y2 + int((y2 - y1) * 0.1))
         elif pomegranate_indicators:
-            # Fallback: use centroid of all pomegranate detections
-            cx_avg = int(np.mean([d.bbox_center[0] for d in pomegranate_indicators]))
-            cy_max = max(d.bbox_xyxy[3] for d in pomegranate_indicators)
-            trunk_base_x = cx_avg
-            trunk_base_y = min(h - 5, cy_max + 30)
+            # Try vertical woody-stem continuity in the lower canopy zone before centroid fallback
+            x_lo = max(int(w * 0.12), min(d.bbox_xyxy[0] for d in pomegranate_indicators))
+            x_hi = min(int(w * 0.88), max(d.bbox_xyxy[2] for d in pomegranate_indicators))
+            stem_xy = self._estimate_woody_trunk_base(image_bgr, x_lo, x_hi)
+            if stem_xy is not None:
+                trunk_base_x, trunk_base_y = stem_xy
+            else:
+                cx_avg = int(np.mean([d.bbox_center[0] for d in pomegranate_indicators]))
+                cy_max = max(d.bbox_xyxy[3] for d in pomegranate_indicators)
+                trunk_base_x = cx_avg
+                trunk_base_y = min(h - 5, cy_max + 30)
         else:
             trunk_base_x = w // 2
             trunk_base_y = h // 2
@@ -356,6 +371,30 @@ class PomegranateVisionDetector:
             frame_resolution=(w, h),
             detection_backend=self.backend,
         )
+
+    @staticmethod
+    def _estimate_woody_trunk_base(
+        image_bgr: np.ndarray, x_lo: int, x_hi: int
+    ) -> Optional[Tuple[int, int]]:
+        """Locate vertical woody stem in the lower canopy zone when trunk_base is unlabelled."""
+        h, w = image_bgr.shape[:2]
+        if h < 40 or w < 40 or x_hi - x_lo < 20:
+            return None
+        y1, y2 = int(h * 0.62), int(h * 0.92)
+        roi = image_bgr[y1:y2, :].astype(np.float32)
+        b, g, r = roi[:, :, 0], roi[:, :, 1], roi[:, :, 2]
+        exg = 2.0 * g - r - b
+        gray = cv2.cvtColor(image_bgr[y1:y2, :], cv2.COLOR_BGR2GRAY).astype(np.float32)
+        gx = np.abs(cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3))
+        gy = np.abs(cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3))
+        is_stem = (exg < 15.0) & (gray > 75.0) & (gx > 12.0) & (gx > gy)
+        col_frac = (cv2.blur(is_stem.astype(np.float32), (15, 1)) > 0.10).mean(axis=0)
+        col_frac = cv2.blur(col_frac.reshape(1, -1), (15, 1)).ravel()
+        seg = col_frac[x_lo:x_hi]
+        if seg.size == 0 or float(np.max(seg)) < 0.35:
+            return None
+        best_x = x_lo + int(np.argmax(seg))
+        return (best_x, y2)
 
     # ───────────────────────────────────────────────────────
     #  HSV Fallback (legacy — used when no YOLO weights exist)

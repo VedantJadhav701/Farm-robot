@@ -39,7 +39,7 @@ def main():
     if args.start_sec > 0:
         cap.set(cv2.CAP_PROP_POS_MSEC, args.start_sec * 1000.0)
 
-    detector = PomegranateVisionDetector(weights_path=args.weights, confidence_threshold=0.70, nms_conf=0.30)
+    detector = PomegranateVisionDetector(weights_path=args.weights, confidence_threshold=0.70, nms_conf=0.22)
     depth = MonocularDepthLocalizer()
     kin = ArmKinematics()
     tracker = TemporalTargetStabilizer(ema_alpha=0.20, max_jump_px=75.0)
