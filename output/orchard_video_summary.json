@@ -1,8 +1,9 @@
 {
-  "input_video": "gemini_generated_video_9aeb227e.mp4",
-  "output_video": "output\\orchard_video_validation.mp4",
-  "frames_processed": 45,
-  "pomegranate_detected_frames": 6,
-  "avg_system1_ms": 86.27,
-  "last_strategy": "SCANNING"
+  "input_video": "data\\real_test_samples\\orchard_turkey_480p.mp4",
+  "output_video": "output\\turkey_orchard_proof.mp4",
+  "frames_processed": 150,
+  "pomegranate_detected_frames": 31,
+  "autonomous_pour_events": 1,
+  "avg_system1_ms": 29.56,
+  "last_strategy": "STANDARD_CLEARANCE_ARC"
 }
