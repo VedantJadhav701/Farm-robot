@@ -1,0 +1,33 @@
+{
+  "weights": "models/phase3/best_phase3.pt",
+  "imgsz": 640,
+  "validation": {
+    "mAP50": 0.7200826330357891,
+    "mAP50-95": 0.4626879341804891,
+    "precision": 0.6995075859494392,
+    "recall": 0.6587841137760303,
+    "per_class": {
+      "pomegranate_fruit": {
+        "AP50": 0.9344741688263524,
+        "AP50-95": 0.6076241828662926
+      },
+      "pomegranate_flower": {
+        "AP50": 0.6755264077371286,
+        "AP50-95": 0.3952833507468391
+      },
+      "pomegranate_tree": {
+        "AP50": 0.5502473225438863,
+        "AP50-95": 0.3851562689283352
+      }
+    }
+  },
+  "benchmark": {
+    "avg_ms": 6.925425755515688,
+    "fps": 144.3954545615567,
+    "format": "pytorch"
+  },
+  "export": {
+    "format": "onnx",
+    "path": "models/phase3/best_phase3.onnx"
+  }
+}

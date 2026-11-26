@@ -1,9 +1,9 @@
 {
   "input_video": "data\\real_test_samples\\orchard_turkey_480p.mp4",
-  "output_video": "output\\turkey_orchard_proof.mp4",
+  "output_video": "output\\turkey_orchard_phase3_proof.mp4",
   "frames_processed": 150,
-  "pomegranate_detected_frames": 31,
-  "autonomous_pour_events": 1,
-  "avg_system1_ms": 29.56,
-  "last_strategy": "STANDARD_CLEARANCE_ARC"
+  "pomegranate_detected_frames": 150,
+  "autonomous_pour_events": 2,
+  "avg_system1_ms": 35.64,
+  "last_strategy": "STANDOFF_ANGLED_JET"
 }
