@@ -244,7 +244,8 @@ class PomegranateVisionDetector:
             conf = float(box.conf[0])
             x1, y1, x2, y2 = [int(v) for v in box.xyxy[0]]
 
-            cls_name = CLASS_NAMES.get(cls_id, f"class_{cls_id}")
+            model_names = getattr(self.model, "names", None) or {}
+            cls_name = str(model_names.get(cls_id, CLASS_NAMES.get(cls_id, f"class_{cls_id}")))
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
             area = (x2 - x1) * (y2 - y1)
 
