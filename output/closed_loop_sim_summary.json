@@ -1,0 +1,14 @@
+{
+  "world": "src/sim/models/orchard_multi_tree_world.xml",
+  "video": "output/closed_loop_orchard_sim.mp4",
+  "frames": 300,
+  "trees_poured": 2,
+  "final_rover_x_m": 5.278,
+  "runner_stats": {
+    "system1_frames": 300,
+    "system1_avg_ms": 35.87,
+    "system1_fps": 27.9,
+    "system2_calls": 51,
+    "system2_avg_ms": 0.0
+  }
+}
