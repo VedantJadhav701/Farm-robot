@@ -1,0 +1,8 @@
+{
+  "input_video": "gemini_generated_video_9aeb227e.mp4",
+  "output_video": "output\\orchard_video_validation.mp4",
+  "frames_processed": 45,
+  "pomegranate_detected_frames": 6,
+  "avg_system1_ms": 86.27,
+  "last_strategy": "SCANNING"
+}
