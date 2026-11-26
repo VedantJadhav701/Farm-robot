@@ -287,13 +287,15 @@ def sim_stream():
     eng = get_sim_engine()
 
     def _gen():
+        last_jpg = None
         while True:
             jpg = eng.get_latest_jpeg()
-            if jpg is not None:
+            if jpg is not None and jpg is not last_jpg:
+                last_jpg = jpg
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
                 )
-            time.sleep(0.05)
+            time.sleep(0.015)
 
     return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")

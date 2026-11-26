@@ -56,9 +56,12 @@ class LiveOrchardSimEngine:
         self.pour_arm_q = np.array([1.45, 0.95, -0.55, 0.0, -0.45, 0.0], dtype=np.float64)
 
         self._lock = threading.Lock()
+        self._jpeg_lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._latest_jpeg: Optional[bytes] = None
+        self._frame_seq = 0
+        self._last_vision = None
 
         # Interactive control state
         self.running = True
@@ -117,6 +120,8 @@ class LiveOrchardSimEngine:
         with self._lock:
             if action == "start":
                 self.estop = False
+                if self.phase == "E-STOP":
+                    self.phase = "DRIVE"
                 self.running = True
                 self._log("[CTRL] Simulation STARTED.")
             elif action == "pause":
@@ -184,7 +189,7 @@ class LiveOrchardSimEngine:
             }
 
     def get_latest_jpeg(self) -> Optional[bytes]:
-        with self._lock:
+        with self._jpeg_lock:
             return self._latest_jpeg
 
     def _render_one_frame_locked(self, step_physics: bool = True):
@@ -282,7 +287,10 @@ class LiveOrchardSimEngine:
         self.renderer.update_scene(self.data, camera=main_cam)
         world_bgr = cv2.cvtColor(self.renderer.render(), cv2.COLOR_RGB2BGR)
 
-        vision = self.detector.analyze_crop_image(onboard_bgr)
+        self._frame_seq += 1
+        if self._last_vision is None or self._frame_seq % 2 == 0:
+            self._last_vision = self.detector.analyze_crop_image(onboard_bgr)
+        vision = self._last_vision
         self.last_conf = vision.confidence
         self.last_s1_ms = vision.inference_ms
         trunk_boxes = [(*d.bbox_xyxy, d.confidence) for d in vision.all_detections if d.class_name == "trunk_base"]
@@ -304,9 +312,10 @@ class LiveOrchardSimEngine:
                     (20, 64), cv2.FONT_HERSHEY_SIMPLEX, 0.52, status_col, 2)
 
         panel = np.hstack([world_bgr, onboard_ann])
-        ok, buf = cv2.imencode(".jpg", panel, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+        ok, buf = cv2.imencode(".jpg", panel, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         if ok:
-            self._latest_jpeg = buf.tobytes()
+            with self._jpeg_lock:
+                self._latest_jpeg = buf.tobytes()
 
     def _loop(self):
         while not self._stop_event.is_set():
@@ -314,4 +323,4 @@ class LiveOrchardSimEngine:
             with self._lock:
                 self._render_one_frame_locked(step_physics=self.running and not self.estop)
             dt = time.perf_counter() - t0
-            time.sleep(max(0.01, 0.05 - dt))
+            time.sleep(0.004 if self.running else 0.04)
