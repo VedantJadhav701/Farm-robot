@@ -41,7 +41,10 @@ tags:
 
 # Pomegranate Dual-Brain AI (`{repo_id}`)
 
-Autonomous **System 1 (CNN) + System 2 (SLM)** Dual-Brain for pomegranate crop verification and precision liquid fertilizer dosing.
+Autonomous **System 1 (CNN) + System 2 (SLM)** Dual-Brain for pomegranate crop verification, 3D monocular depth localization, collision-free 6-DOF arm planning, and precision liquid fertilizer dosing.
+
+- **GitHub Codebase:** [https://github.com/VedantJadhav701/Farm-robot](https://github.com/VedantJadhav701/Farm-robot)
+- **HuggingFace Models:** [https://huggingface.co/{repo_id}](https://huggingface.co/{repo_id})
 
 ## Architecture
 
