@@ -1,0 +1,233 @@
+<mujoco model="full_field_orchard">
+  <compiler angle="radian" coordinate="local" meshdir="meshes"/>
+
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicitfast"/>
+
+  <visual>
+    <headlight ambient="0.48 0.48 0.48" diffuse="0.85 0.85 0.8" specular="0.3 0.3 0.3"/>
+    <rgba haze="0.85 0.90 0.96 1"/>
+    <global fovy="58" offwidth="1280" offheight="720"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.52 0.78 0.98" rgb2="0.90 0.95 1.0" width="512" height="512"/>
+    <texture name="tex_soil" type="2d" builtin="checker" rgb1="0.48 0.33 0.21" rgb2="0.42 0.28 0.17" width="512" height="512" mark="random" markrgb="0.34 0.22 0.13"/>
+    <texture name="tex_ridge" type="2d" builtin="flat" rgb1="0.36 0.24 0.14" width="128" height="128"/>
+    <texture name="tex_chassis" type="2d" builtin="flat" rgb1="0.14 0.16 0.19" width="128" height="128"/>
+    <texture name="tex_arm" type="2d" builtin="flat" rgb1="0.92 0.94 0.96" width="128" height="128"/>
+    <texture name="tex_bark" type="2d" builtin="flat" rgb1="0.36 0.24 0.16" width="128" height="128"/>
+    <texture name="tex_leaf" type="2d" builtin="flat" rgb1="0.14 0.52 0.14" width="128" height="128"/>
+    <texture name="tex_weed" type="2d" builtin="flat" rgb1="0.26 0.68 0.14" width="128" height="128"/>
+    <texture name="tex_fruit" type="2d" builtin="flat" rgb1="0.88 0.10 0.10" width="128" height="128"/>
+
+    <material name="mat_soil" texture="tex_soil" texrepeat="45 45" roughness="0.95" reflectance="0.02"/>
+    <material name="mat_ridge" texture="tex_ridge" roughness="0.95"/>
+    <material name="mat_pipe" rgba="0.08 0.08 0.09 1" roughness="0.6"/>
+    <material name="mat_chassis" texture="tex_chassis" specular="0.4" shininess="0.3"/>
+    <material name="mat_arm" texture="tex_arm" specular="0.6" shininess="0.5"/>
+    <material name="mat_metal" rgba="0.72 0.76 0.82 1" specular="0.8" shininess="0.8"/>
+    <material name="mat_tire" rgba="0.10 0.10 0.10 1" roughness="0.9"/>
+    <material name="mat_tank" rgba="0.88 0.95 1.0 0.88"/>
+    <material name="mat_bark" texture="tex_bark" roughness="0.9"/>
+    <material name="mat_leaf" texture="tex_leaf"/>
+    <material name="mat_weed" texture="tex_weed"/>
+    <material name="mat_fruit" texture="tex_fruit" specular="0.5" shininess="0.4"/>
+    <material name="mat_nozzle" rgba="0.95 0.72 0.10 1"/>
+  </asset>
+
+  <worldbody>
+    <geom name="ground" type="plane" size="40 25 0.1" material="mat_soil" friction="1.3 0.05 0.005"/>
+    <light directional="true" pos="6 -6 10" dir="-0.3 0.4 -1" castshadow="true" diffuse="0.92 0.88 0.82"/>
+
+    <!-- Full-Field High Isometric Overview Camera -->
+    <camera name="field_overview_cam" pos="7.5 -6.8 6.2" xyaxes="1.0 0.0 0.0 0.0 0.62 0.78"/>
+
+    <!-- 3 Parallel Orchard Soil Beds & Drip Lines -->
+    <geom name="bed_left" type="box" size="10.0 0.35 0.05" pos="7.5 -1.25 0.05" material="mat_ridge"/>
+    <geom name="bed_center_r" type="box" size="10.0 0.35 0.05" pos="7.5 0.75 0.05" material="mat_ridge"/>
+    <geom name="bed_far_r" type="box" size="10.0 0.35 0.05" pos="7.5 2.85 0.05" material="mat_ridge"/>
+    <geom name="drip_center_r" type="capsule" fromto="-1.0 0.70 0.11 17.5 0.70 0.11" size="0.012" material="mat_pipe"/>
+
+    <!-- ACTIVE ROW (y=+0.72m): 8 Mature Pomegranate Trees (x=1.4 .. 14.0m) -->
+    <body name="tree_1" pos="1.4 0.72 0.08">
+      <geom type="cylinder" size="0.05 0.32" pos="0 0 0.32" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.36 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.056" pos="-0.18 -0.22 0.72" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.08 -0.25 0.84" material="mat_fruit"/>
+      <geom type="sphere" size="0.052" pos="0.22 -0.18 0.76" material="mat_fruit"/>
+      <geom type="capsule" fromto="-0.10 -0.09 0 -0.13 -0.06 0.09" size="0.015" material="mat_weed"/>
+    </body>
+    <body name="tree_2" pos="3.2 0.72 0.08">
+      <geom type="cylinder" size="0.052 0.33" pos="0 0 0.33" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.96" material="mat_leaf"/>
+      <geom type="sphere" size="0.056" pos="-0.20 -0.23 0.74" material="mat_fruit"/>
+      <geom type="sphere" size="0.060" pos="0.06 -0.26 0.86" material="mat_fruit"/>
+      <geom type="sphere" size="0.054" pos="0.20 -0.20 0.78" material="mat_fruit"/>
+      <geom type="capsule" fromto="0.11 -0.08 0 0.14 -0.05 0.09" size="0.015" material="mat_weed"/>
+    </body>
+    <body name="tree_3" pos="5.0 0.72 0.08">
+      <geom type="cylinder" size="0.05 0.32" pos="0 0 0.32" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.36 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="-0.16 -0.22 0.75" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.10 -0.25 0.85" material="mat_fruit"/>
+    </body>
+    <body name="tree_4" pos="6.8 0.72 0.08">
+      <geom type="cylinder" size="0.052 0.33" pos="0 0 0.33" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.96" material="mat_leaf"/>
+      <geom type="sphere" size="0.056" pos="-0.18 -0.23 0.73" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.08 -0.26 0.84" material="mat_fruit"/>
+      <geom type="capsule" fromto="-0.09 -0.10 0 -0.11 -0.07 0.09" size="0.015" material="mat_weed"/>
+    </body>
+    <body name="tree_5" pos="8.6 0.72 0.08">
+      <geom type="cylinder" size="0.05 0.32" pos="0 0 0.32" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.36 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="-0.18 -0.22 0.74" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.10 -0.24 0.85" material="mat_fruit"/>
+    </body>
+    <body name="tree_6" pos="10.4 0.72 0.08">
+      <geom type="cylinder" size="0.052 0.33" pos="0 0 0.33" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.96" material="mat_leaf"/>
+      <geom type="sphere" size="0.056" pos="-0.17 -0.23 0.75" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.09 -0.25 0.86" material="mat_fruit"/>
+    </body>
+    <body name="tree_7" pos="12.2 0.72 0.08">
+      <geom type="cylinder" size="0.05 0.32" pos="0 0 0.32" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.36 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="-0.18 -0.22 0.74" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.09 -0.25 0.84" material="mat_fruit"/>
+    </body>
+    <body name="tree_8" pos="14.0 0.72 0.08">
+      <geom type="cylinder" size="0.052 0.33" pos="0 0 0.33" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.96" material="mat_leaf"/>
+      <geom type="sphere" size="0.056" pos="-0.18 -0.23 0.74" material="mat_fruit"/>
+      <geom type="sphere" size="0.058" pos="0.08 -0.25 0.85" material="mat_fruit"/>
+    </body>
+
+    <!-- LEFT OPPOSITE ROW (y=-1.25m) -->
+    <body name="ltree_1" pos="1.8 -1.25 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="0.10 0.24 0.80" material="mat_fruit"/>
+    </body>
+    <body name="ltree_2" pos="4.4 -1.25 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="-0.10 0.24 0.82" material="mat_fruit"/>
+    </body>
+    <body name="ltree_3" pos="7.0 -1.25 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="0.10 0.24 0.80" material="mat_fruit"/>
+    </body>
+    <body name="ltree_4" pos="9.6 -1.25 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="-0.10 0.24 0.82" material="mat_fruit"/>
+    </body>
+    <body name="ltree_5" pos="12.2 -1.25 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+      <geom type="sphere" size="0.055" pos="0.10 0.24 0.80" material="mat_fruit"/>
+    </body>
+
+    <!-- FAR RIGHT ROW (y=+2.85m, field depth visual) -->
+    <body name="ftree_1" pos="2.2 2.85 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+    </body>
+    <body name="ftree_2" pos="5.8 2.85 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+    </body>
+    <body name="ftree_3" pos="9.4 2.85 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+    </body>
+    <body name="ftree_4" pos="13.0 2.85 0.08">
+      <geom type="cylinder" size="0.05 0.34" pos="0 0 0.34" material="mat_bark"/>
+      <geom type="ellipsoid" size="0.38 0.34 0.30" pos="0 0 0.95" material="mat_leaf"/>
+    </body>
+
+    <!-- 4WD ROVER CHASSIS & 6-DOF MANIPULATOR -->
+    <body name="rover_chassis" pos="0 0 0.17">
+      <freejoint name="chassis_freejoint"/>
+
+      <geom name="chassis_geom" type="box" size="0.45 0.3 0.12" material="mat_chassis" mass="35"/>
+      <geom name="top_plate" type="box" size="0.42 0.28 0.01" pos="0 0 0.13" material="mat_metal" mass="5"/>
+      <geom name="front_bumper" type="capsule" fromto="0.46 -0.28 0.0 0.46 0.28 0.0" size="0.03" material="mat_metal"/>
+      <geom name="rear_bumper" type="capsule" fromto="-0.46 -0.28 0.0 -0.46 0.28 0.0" size="0.03" material="mat_metal"/>
+      <geom name="liquid_tank" type="cylinder" size="0.14 0.15" pos="-0.22 0 0.25" zaxis="0 1 0" material="mat_tank" mass="10"/>
+
+      <body name="wheel_fl" pos="0.28 0.36 -0.02">
+        <joint name="joint_wheel_fl" type="hinge" axis="0 1 0" damping="0.8"/>
+        <geom name="geom_wheel_fl" type="cylinder" size="0.15 0.06" zaxis="0 1 0" material="mat_tire" mass="4" friction="1.5 0.05 0.01"/>
+      </body>
+      <body name="wheel_fr" pos="0.28 -0.36 -0.02">
+        <joint name="joint_wheel_fr" type="hinge" axis="0 1 0" damping="0.8"/>
+        <geom name="geom_wheel_fr" type="cylinder" size="0.15 0.06" zaxis="0 1 0" material="mat_tire" mass="4" friction="1.5 0.05 0.01"/>
+      </body>
+      <body name="wheel_rl" pos="-0.28 0.36 -0.02">
+        <joint name="joint_wheel_rl" type="hinge" axis="0 1 0" damping="0.8"/>
+        <geom name="geom_wheel_rl" type="cylinder" size="0.15 0.06" zaxis="0 1 0" material="mat_tire" mass="4" friction="1.5 0.05 0.01"/>
+      </body>
+      <body name="wheel_rr" pos="-0.28 -0.36 -0.02">
+        <joint name="joint_wheel_rr" type="hinge" axis="0 1 0" damping="0.8"/>
+        <geom name="geom_wheel_rr" type="cylinder" size="0.15 0.06" zaxis="0 1 0" material="mat_tire" mass="4" friction="1.5 0.05 0.01"/>
+      </body>
+
+      <camera name="rover_orchard_cam" pos="0.30 0.08 0.42" xyaxes="0.76 -0.65 0.0 -0.04 -0.05 1.0"/>
+      <camera name="rover_follow_cam" pos="-1.45 -0.95 1.05" xyaxes="0.65 -0.76 0.0 0.30 0.26 0.92"/>
+
+      <body name="arm_base" pos="0.15 0 0.14">
+        <geom name="arm_base_mount" type="cylinder" size="0.09 0.05" material="mat_arm" mass="3"/>
+        <body name="link_1" pos="0 0 0.05">
+          <joint name="joint_1_yaw" type="hinge" axis="0 0 1" range="-3.14 3.14" damping="1.5"/>
+          <geom name="link_1_geom" type="cylinder" size="0.08 0.08" pos="0 0 0.08" material="mat_arm" mass="2.5"/>
+          <body name="link_2" pos="0 0 0.16">
+            <joint name="joint_2_shoulder" type="hinge" axis="0 1 0" range="-1.8 1.8" damping="1.5"/>
+            <geom name="link_2_geom" type="capsule" fromto="0 0 0 0 0 0.38" size="0.06" material="mat_arm" mass="3.5"/>
+            <body name="link_3" pos="0 0 0.38">
+              <joint name="joint_3_elbow" type="hinge" axis="0 1 0" range="-2.4 2.4" damping="1.2"/>
+              <geom name="link_3_geom" type="capsule" fromto="0 0 0 0.35 0 0" size="0.05" material="mat_arm" mass="2.8"/>
+              <body name="link_4" pos="0.35 0 0">
+                <joint name="joint_4_forearm_roll" type="hinge" axis="1 0 0" range="-3.14 3.14" damping="0.8"/>
+                <geom name="link_4_geom" type="cylinder" size="0.045 0.05" pos="0.05 0 0" zaxis="1 0 0" material="mat_arm" mass="1.8"/>
+                <body name="link_5" pos="0.10 0 0">
+                  <joint name="joint_5_wrist_pitch" type="hinge" axis="0 1 0" range="-1.8 1.8" damping="0.6"/>
+                  <geom name="link_5_geom" type="capsule" fromto="0 0 0 0.08 0 0" size="0.04" material="mat_arm" mass="1.2"/>
+                  <body name="link_6_flange" pos="0.08 0 0">
+                    <joint name="joint_6_wrist_roll" type="hinge" axis="1 0 0" range="-3.14 3.14" damping="0.4"/>
+                    <geom name="link_6_geom" type="cylinder" size="0.038 0.03" pos="0.03 0 0" zaxis="1 0 0" material="mat_arm" mass="0.8"/>
+                    <body name="dual_action_toolhead" pos="0.06 0 0">
+                      <geom name="tool_housing" type="box" size="0.04 0.04 0.06" pos="0 0 -0.04" material="mat_chassis" mass="0.6"/>
+                      <body name="rotary_weeder" pos="0 0 -0.12">
+                        <joint name="joint_weeder_spin" type="hinge" axis="0 0 1" damping="0.05"/>
+                        <geom name="weeder_disc" type="cylinder" size="0.07 0.008" material="mat_metal" mass="0.3"/>
+                      </body>
+                      <geom name="spray_nozzle" type="cylinder" size="0.014 0.025" pos="0.03 0.02 -0.06" zaxis="1 1 -1" material="mat_nozzle"/>
+                      <site name="tool_tip" pos="0.04 0.03 -0.08" size="0.015" rgba="0 1 1 0.9"/>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="act_wheel_fl" joint="joint_wheel_fl" gear="25"/>
+    <motor name="act_wheel_fr" joint="joint_wheel_fr" gear="25"/>
+    <motor name="act_wheel_rl" joint="joint_wheel_rl" gear="25"/>
+    <motor name="act_wheel_rr" joint="joint_wheel_rr" gear="25"/>
+    <position name="act_joint_1" joint="joint_1_yaw" kp="250" kv="20"/>
+    <position name="act_joint_2" joint="joint_2_shoulder" kp="350" kv="25"/>
+    <position name="act_joint_3" joint="joint_3_elbow" kp="280" kv="20"/>
+    <position name="act_joint_4" joint="joint_4_forearm_roll" kp="150" kv="12"/>
+    <position name="act_joint_5" joint="joint_5_wrist_pitch" kp="120" kv="10"/>
+    <position name="act_joint_6" joint="joint_6_wrist_roll" kp="80" kv="8"/>
+    <velocity name="act_weeder_spin" joint="joint_weeder_spin" kv="0.2"/>
+  </actuator>
+</mujoco>

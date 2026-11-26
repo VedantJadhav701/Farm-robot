@@ -11,12 +11,13 @@ Production API layer for the Physical AI Dual-Brain:
 
 import base64
 import sqlite3
+import time
 from pathlib import Path
 from typing import Optional, List
 import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from src.perception.pomegranate_detector import PomegranateVisionDetector
@@ -25,6 +26,7 @@ from src.api.llm_brain import LLMBrainSupervisor, OperatorIntent
 from src.control.kinematics import ArmKinematics
 from src.control.fertilizer_controller import FertilizerDosingController
 from src.hardware.ros2_actuator_bridge import ROS2ActuatorBridge, SafetyTelemetry
+from src.sim.live_sim_engine import LiveOrchardSimEngine
 
 app = FastAPI(
     title="Physical AI Pomegranate Dual-Brain API",
@@ -38,8 +40,13 @@ _state = {}
 
 def get_components():
     if "detector" not in _state:
+        weights = (
+            "models/phase3/best_phase3.pt"
+            if Path("models/phase3/best_phase3.pt").exists()
+            else "models/best.pt"
+        )
         _state["detector"] = PomegranateVisionDetector(
-            weights_path="models/best.pt", confidence_threshold=0.70
+            weights_path=weights, confidence_threshold=0.70, nms_conf=0.22
         )
         _state["depth"] = MonocularDepthLocalizer()
         _state["brain"] = LLMBrainSupervisor(
@@ -226,3 +233,67 @@ def get_audit_log(limit: int = 10):
     ).fetchall()
     conn.close()
     return {"records": [dict(r) for r in rows]}
+
+
+# ═══════════════════════════════════════════════════════════════
+#  LIVE FULL-FIELD 3D MUJOCO SIMULATION WEB COCKPIT (/sim)
+# ═══════════════════════════════════════════════════════════════
+
+def get_sim_engine() -> LiveOrchardSimEngine:
+    if "sim_engine" not in _state:
+        eng = LiveOrchardSimEngine()
+        eng.start_background_loop()
+        _state["sim_engine"] = eng
+    return _state["sim_engine"]
+
+
+class SimControlRequest(BaseModel):
+    action: str
+    mode: Optional[str] = None
+    camera_view: Optional[str] = None
+    dose_ml: Optional[float] = None
+    linear: Optional[float] = 0.0
+    turn: Optional[float] = 0.0
+
+
+@app.get("/sim", response_class=HTMLResponse)
+def sim_cockpit():
+    html_path = Path("src/api/static/sim.html")
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Simulation cockpit not found")
+    return html_path.read_text(encoding="utf-8")
+
+
+@app.get("/sim/state")
+def sim_state():
+    return get_sim_engine().get_state()
+
+
+@app.post("/sim/control")
+def sim_control(req: SimControlRequest):
+    eng = get_sim_engine()
+    return eng.command(
+        req.action,
+        mode=req.mode,
+        camera_view=req.camera_view,
+        dose_ml=req.dose_ml,
+        linear=req.linear,
+        turn=req.turn,
+    )
+
+
+@app.get("/sim/stream")
+def sim_stream():
+    eng = get_sim_engine()
+
+    def _gen():
+        while True:
+            jpg = eng.get_latest_jpeg()
+            if jpg is not None:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
+                )
+            time.sleep(0.05)
+
+    return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
