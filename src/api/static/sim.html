@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Full-Field Orchard 3D Live Simulation & Control</title>
+  <title>60 FPS WebGL 3D Orchard Simulator + Eye-in-Hand Visual Servoing</title>
   <style>
     :root {
       --bg: #0b0f17;
@@ -20,30 +20,37 @@
     body { margin: 0; background: var(--bg); color: var(--text); }
     header {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 22px; background: #0f1520; border-bottom: 1px solid var(--border);
+      padding: 12px 22px; background: #0f1520; border-bottom: 1px solid var(--border);
     }
-    header h1 { margin: 0; font-size: 18px; color: var(--accent); letter-spacing: 0.3px; }
+    header h1 { margin: 0; font-size: 17px; color: var(--accent); }
     .nav-btn {
       color: var(--cyan); text-decoration: none; font-size: 13px;
       border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;
     }
     .grid {
       display: grid; grid-template-columns: 1fr 360px; gap: 16px;
-      padding: 16px 20px; max-width: 1600px; margin: 0 auto;
+      padding: 14px 18px; max-width: 1680px; margin: 0 auto;
     }
     @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
-    .card {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 10px; padding: 14px;
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+    .viewport-wrap { position: relative; width: 100%; height: 540px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: #070b12; }
+    #webglCanvas { width: 100%; height: 100%; display: block; }
+    .pip-cam {
+      position: absolute; bottom: 12px; left: 12px; width: 250px;
+      border: 2px solid var(--cyan); border-radius: 8px; overflow: hidden;
+      background: #05080d; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     }
-    .video-wrap img {
-      width: 100%; border-radius: 8px; border: 1px solid var(--border);
-      background: #05080d; display: block;
+    .pip-cam .pip-hdr { font-size: 10px; font-weight: 700; padding: 3px 8px; background: rgba(10,16,26,0.9); color: var(--cyan); }
+    .pip-cam img { width: 100%; display: block; }
+    .hud-pill {
+      position: absolute; top: 12px; left: 12px;
+      background: rgba(12,18,28,0.86); border: 1px solid var(--border);
+      padding: 7px 12px; border-radius: 8px; font-size: 12px; color: var(--text);
     }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
     button {
       cursor: pointer; border: 1px solid var(--border); background: #1a2436;
-      color: var(--text); padding: 9px 13px; border-radius: 7px; font-weight: 600; font-size: 13px;
+      color: var(--text); padding: 8px 12px; border-radius: 7px; font-weight: 600; font-size: 12.5px;
     }
     button:hover { border-color: var(--cyan); }
     .btn-start { background: #0d3b2b; border-color: var(--accent); color: var(--accent); }
@@ -51,40 +58,57 @@
     .btn-estop { background: #451217; border-color: var(--danger); color: #ff8080; }
     .btn-active { background: #10324a; border-color: var(--cyan); color: var(--cyan); }
     .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
-    .stat { background: #0d131d; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-    .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-    .stat .v { font-size: 16px; font-weight: 700; margin-top: 2px; color: var(--text); }
-    .progress-bg { height: 10px; background: #0b1018; border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
+    .stat { background: #0d131d; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+    .stat .k { font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
+    .stat .v { font-size: 14.5px; font-weight: 700; margin-top: 2px; color: var(--text); }
+    .progress-bg { height: 9px; background: #0b1018; border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
     .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); width: 0%; transition: width 0.25s; }
-    .teleop { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+    .teleop { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
     .logs {
       background: #090d14; border: 1px solid var(--border); border-radius: 8px;
-      padding: 8px 10px; height: 165px; overflow-y: auto; font-family: monospace; font-size: 11.5px; color: #b7c8df;
+      padding: 8px 10px; height: 145px; overflow-y: auto; font-family: monospace; font-size: 11px; color: #b7c8df;
     }
-    .logs div { margin-bottom: 4px; }
-    label { font-size: 12px; color: var(--muted); display: block; margin-top: 8px; }
+    .logs div { margin-bottom: 3px; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-top: 6px; }
     input[type="range"] { width: 100%; }
   </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <header>
-    <h1>Physical AI Full-Field 3D Orchard Simulator (8-Tree Row + Phase 3 Dual-Brain)</h1>
+    <h1>Physical AI 60 FPS WebGL 3D Orchard Simulator + Eye-in-Hand Visual Servoing</h1>
     <div style="display:flex; gap:10px; align-items:center;">
-      <span id="liveBadge" style="font-size:12px; color:#00e68a;">● LIVE</span>
-      <a class="nav-btn" href="/">← Static Image & Voice Cockpit</a>
+      <span id="liveBadge" style="font-size:12px; color:#00e68a;">● 60 FPS WEBGL</span>
+      <a class="nav-btn" href="/">← Image & Voice Cockpit</a>
     </div>
   </header>
 
   <div class="grid">
-    <div class="card video-wrap">
+    <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <strong style="font-size:14px;">3D Orchard World (Left) + Onboard Phase 3 YOLO Sensor (Right)</strong>
-        <span style="font-size:12px; color:var(--muted);">Keyboard: W/A/S/D Drive | Space Stop | P Pour</span>
+        <strong style="font-size:13.5px;">Interactive 3D Orchard World (Drag to Orbit • Scroll to Zoom • W/A/S/D Drive)</strong>
+        <span id="fpsTag" style="font-size:12px; color:var(--accent);">60 FPS</span>
       </div>
-      <img id="simStream" src="/sim/stream" alt="Live MuJoCo Simulation Stream" />
-      <div style="margin-top:12px;">
+      <div class="viewport-wrap">
+        <canvas id="webglCanvas"></canvas>
+        <div class="hud-pill" id="hudOverlay">
+          PHASE: <strong style="color:var(--accent);">DRIVE</strong> | IBVS: 0.0 cm | Tree 1/8
+        </div>
+        <div class="pip-cam">
+          <div class="pip-hdr">ONBOARD PHASE 3 YOLO SENSOR</div>
+          <img src="/sim/onboard_stream" alt="Onboard Phase 3 YOLO Feed" />
+        </div>
+      </div>
+      <div style="margin-top:10px;">
         <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
-          <span>Field Row Traversal Progress</span>
+          <span>Full-Field 8-Tree Row Progress</span>
           <span id="progressText">Tree 1 / 8 (0 poured)</span>
         </div>
         <div class="progress-bg"><div id="progressFill" class="progress-fill"></div></div>
@@ -94,46 +118,47 @@
     <div class="card">
       <strong style="font-size:14px;">Simulation Controls</strong>
       <div class="row" style="margin-top:8px;">
-        <button class="btn-start" onclick="sendCtrl('start')">▶ Start / Resume</button>
-        <button class="btn-pause" onclick="sendCtrl('pause')">⏸ Pause / Stop</button>
-        <button class="btn-estop" onclick="sendCtrl('estop')">⛔ E-STOP</button>
-        <button onclick="sendCtrl('reset')">↺ Reset Field</button>
+        <button class="btn-start" onclick="window.sendCtrl('start')">▶ Start / Resume</button>
+        <button class="btn-pause" onclick="window.sendCtrl('pause')">⏸ Pause</button>
+        <button class="btn-estop" onclick="window.sendCtrl('estop')">⛔ E-STOP</button>
+        <button onclick="window.sendCtrl('reset')">↺ Reset Field</button>
       </div>
 
-      <strong style="font-size:13px;">Control Mode & Camera</strong>
+      <strong style="font-size:13px;">Mode & 3D Camera Presets</strong>
       <div class="row" style="margin-top:6px;">
-        <button id="btnAuto" class="btn-active" onclick="sendCtrl('mode', {mode:'AUTO'})">🤖 Autonomous</button>
-        <button id="btnManual" onclick="sendCtrl('mode', {mode:'MANUAL'})">🎮 Manual Teleop</button>
-        <button id="btnFollow" class="btn-active" onclick="sendCtrl('camera', {camera_view:'FOLLOW'})">📷 Chase Cam</button>
-        <button id="btnOverview" onclick="sendCtrl('camera', {camera_view:'OVERVIEW'})">🛰 Full-Field Cam</button>
+        <button id="btnAuto" class="btn-active" onclick="window.sendCtrl('mode', {mode:'AUTO'})">🤖 Auto</button>
+        <button id="btnManual" onclick="window.sendCtrl('mode', {mode:'MANUAL'})">🎮 Manual</button>
+        <button id="camChase" class="btn-active" onclick="window.setCamPreset('CHASE')">📷 Chase</button>
+        <button id="camField" onclick="window.setCamPreset('OVERVIEW')">🛰 Full Field</button>
+        <button id="camFree" onclick="window.setCamPreset('FREE')">🌀 Free Orbit</button>
       </div>
 
-      <label>Fertilizer Dose Target: <strong id="doseLabel" style="color:var(--cyan);">80 mL</strong> (12.5 cm basal ring)</label>
+      <label>Fertilizer Dose: <strong id="doseLabel" style="color:var(--cyan);">80 mL</strong> (12.5 cm ring)</label>
       <input type="range" min="10" max="500" step="10" value="80"
         oninput="document.getElementById('doseLabel').innerText=this.value+' mL'"
-        onchange="sendCtrl('dose', {dose_ml: Number(this.value)})" />
+        onchange="window.sendCtrl('dose', {dose_ml: Number(this.value)})" />
 
-      <strong style="font-size:13px; display:block; margin-top:10px;">Manual Rover & 6-DOF Arm Teleop</strong>
+      <strong style="font-size:13px; display:block; margin-top:8px;">Manual Teleop & 6-DOF Arm</strong>
       <div class="teleop">
         <div></div>
-        <button onmousedown="teleop(1,0)" onmouseup="teleop(0,0)" ontouchstart="teleop(1,0)" ontouchend="teleop(0,0)">▲ Forward</button>
+        <button onmousedown="window.teleop(1,0)" onmouseup="window.teleop(0,0)">▲ Forward</button>
         <div></div>
-        <button onmousedown="teleop(0,1)" onmouseup="teleop(0,0)">◀ Left</button>
-        <button onclick="teleop(0,0)">■ Stop</button>
-        <button onmousedown="teleop(0,-1)" onmouseup="teleop(0,0)">▶ Right</button>
+        <button onmousedown="window.teleop(0,1)" onmouseup="window.teleop(0,0)">◀ Left</button>
+        <button onclick="window.teleop(0,0)">■ Stop</button>
+        <button onmousedown="window.teleop(0,-1)" onmouseup="window.teleop(0,0)">▶ Right</button>
         <div></div>
-        <button onmousedown="teleop(-1,0)" onmouseup="teleop(0,0)">▼ Reverse</button>
+        <button onmousedown="window.teleop(-1,0)" onmouseup="window.teleop(0,0)">▼ Reverse</button>
         <div></div>
       </div>
-      <div class="row" style="margin-top:8px;">
-        <button class="btn-active" style="flex:1;" onclick="sendCtrl('manual_pour')">💧 Extend Arm & Pour</button>
-        <button style="flex:1;" onclick="sendCtrl('manual_retract')">↩ Retract Arm</button>
+      <div class="row" style="margin-top:6px;">
+        <button class="btn-active" style="flex:1;" onclick="window.sendCtrl('manual_pour')">💧 IBVS Pour</button>
+        <button style="flex:1;" onclick="window.sendCtrl('manual_retract')">↩ Retract Arm</button>
       </div>
 
       <div class="stat-grid">
-        <div class="stat"><div class="k">Phase</div><div id="stPhase" class="v" style="font-size:13px;">DRIVE</div></div>
-        <div class="stat"><div class="k">Position (X)</div><div id="stPos" class="v">0.00 m</div></div>
-        <div class="stat"><div class="k">System 1 YOLO</div><div id="stS1" class="v">0.0% / 0ms</div></div>
+        <div class="stat"><div class="k">Phase</div><div id="stPhase" class="v" style="font-size:12.5px;">DRIVE</div></div>
+        <div class="stat"><div class="k">IBVS Error</div><div id="stIbvs" class="v">0.0 cm</div></div>
+        <div class="stat"><div class="k">System 1 YOLO</div><div id="stS1" class="v">0% / 0ms</div></div>
         <div class="stat"><div class="k">4-Gate Safety</div><div id="stGate" class="v" style="color:var(--accent);">4/4 ARMED</div></div>
       </div>
 
@@ -142,36 +167,201 @@
     </div>
   </div>
 
-  <script>
-    async function sendCtrl(action, extra = {}) {
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const canvas = document.getElementById('webglCanvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9ac8f0);
+    scene.fog = new THREE.Fog(0xb9daf5, 14, 38);
+
+    const camera = new THREE.PerspectiveCamera(55, 16/9, 0.1, 100);
+    camera.position.set(-1.8, 1.4, 1.8);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    function resize() {
+      const w = canvas.parentElement.clientWidth;
+      const h = canvas.parentElement.clientHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Lighting
+    scene.add(new THREE.HemisphereLight(0xdff2ff, 0x5d432c, 0.85));
+    const sun = new THREE.DirectionalLight(0xfff4de, 1.35);
+    sun.position.set(8, 14, -8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -12; sun.shadow.camera.right = 20;
+    sun.shadow.camera.top = 12; sun.shadow.camera.bottom = -12;
+    scene.add(sun);
+
+    // Coordinate mapping: MuJoCo (x forward, y left, z up) -> Three.js (X=x, Y=z, Z=-y)
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(50, 30),
+      new THREE.MeshStandardMaterial({ color: 0x7a5638, roughness: 0.95 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Raised beds & grass verges
+    const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c3d24, roughness: 0.95 });
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x356e24, roughness: 0.9 });
+    [-1.25, 0.75, 2.85].forEach((mjY) => {
+      const bed = new THREE.Mesh(new THREE.BoxGeometry(20, 0.08, 0.72), bedMat);
+      bed.position.set(7.5, 0.04, -mjY);
+      bed.receiveShadow = true;
+      scene.add(bed);
+    });
+    [0.32, -0.82].forEach((mjY) => {
+      const gr = new THREE.Mesh(new THREE.BoxGeometry(20, 0.01, 0.44), grassMat);
+      gr.position.set(7.5, 0.005, -mjY);
+      scene.add(gr);
+    });
+    const drip = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 19, 8),
+      new THREE.MeshStandardMaterial({ color: 0x16181d })
+    );
+    drip.rotation.z = Math.PI / 2;
+    drip.position.set(7.5, 0.09, -0.70);
+    scene.add(drip);
+
+    // Multi-stem Pomegranate Tree builder
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x5a3b26, roughness: 0.9 });
+    const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x246b22, roughness: 0.85 });
+    const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x185217, roughness: 0.88 });
+    const fruitMat = new THREE.MeshStandardMaterial({ color: 0xd91818, roughness: 0.35 });
+    const treeRings = [];
+
+    function buildPomegranateTree(mjX, mjY, isTargetRow) {
+      const g = new THREE.Group();
+      g.position.set(mjX, 0.08, -mjY);
+
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.052, 0.55, 10), barkMat);
+      trunk.position.y = 0.27; trunk.castShadow = true; g.add(trunk);
+
+      const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.50, 8), barkMat);
+      branch.position.set(0.08, 0.32, 0.05); branch.rotation.z = -0.35; g.add(branch);
+
+      [[0, 0.95, 0, 0.36], [-0.14, 0.84, 0.08, 0.28], [0.16, 0.88, -0.06, 0.30]].forEach(([x,y,z,r], idx) => {
+        const c = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), idx % 2 ? leafMat2 : leafMat1);
+        c.position.set(x, y, z); c.scale.set(1.1, 0.85, 1.0); c.castShadow = true; g.add(c);
+      });
+
+      [[-0.20, 0.70, 0.24], [0.06, 0.82, 0.26], [0.20, 0.75, 0.20]].forEach(([x,y,z]) => {
+        const f = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), fruitMat);
+        f.position.set(x, y, z); f.castShadow = true; g.add(f);
+      });
+
+      if (isTargetRow) {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.11, 0.15, 24),
+          new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(0, 0.015, 0.14);
+        g.add(ring);
+        treeRings.push(ring);
+      }
+      scene.add(g);
+    }
+
+    const activeTreeXs = [1.4, 3.2, 5.0, 6.8, 8.6, 10.4, 12.2, 14.0];
+    activeTreeXs.forEach((x) => buildPomegranateTree(x, 0.72, true));
+    [1.8, 4.4, 7.0, 9.6, 12.2].forEach((x) => buildPomegranateTree(x, -1.25, false));
+    [2.2, 5.8, 9.4, 13.0].forEach((x) => buildPomegranateTree(x, 2.85, false));
+
+    // 4WD Rover + 6-DOF Arm
+    const rover = new THREE.Group();
+    const chassis = new THREE.Mesh(
+      new THREE.BoxGeometry(0.90, 0.24, 0.60),
+      new THREE.MeshStandardMaterial({ color: 0x232933, roughness: 0.5 })
+    );
+    chassis.castShadow = true; rover.add(chassis);
+    const tank = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.30, 16),
+      new THREE.MeshStandardMaterial({ color: 0xdbeafe, roughness: 0.2 })
+    );
+    tank.rotation.x = Math.PI / 2; tank.position.set(-0.22, 0.24, 0); rover.add(tank);
+
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.9 });
+    [[0.28, -0.02, -0.36], [0.28, -0.02, 0.36], [-0.28, -0.02, -0.36], [-0.28, -0.02, 0.36]].forEach(([x,y,z]) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.12, 16), wheelMat);
+      w.rotation.x = Math.PI / 2; w.position.set(x, y, z); w.castShadow = true; rover.add(w);
+    });
+
+    const armMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.25, roughness: 0.35 });
+    const armYaw = new THREE.Group(); armYaw.position.set(0.15, 0.19, 0); rover.add(armYaw);
+    const l1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.16, 12), armMat);
+    l1.position.y = 0.08; armYaw.add(l1);
+
+    const armShoulder = new THREE.Group(); armShoulder.position.set(0, 0.16, 0); armYaw.add(armShoulder);
+    const l2 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.38, 12), armMat);
+    l2.position.y = 0.19; l2.castShadow = true; armShoulder.add(l2);
+
+    const armElbow = new THREE.Group(); armElbow.position.set(0, 0.38, 0); armShoulder.add(armElbow);
+    const l3 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.42, 12), armMat);
+    l3.rotation.z = -Math.PI / 2; l3.position.x = 0.21; l3.castShadow = true; armElbow.add(l3);
+
+    const nozzle = new THREE.Mesh(
+      new THREE.ConeGeometry(0.03, 0.09, 12),
+      new THREE.MeshStandardMaterial({ color: 0xf59e0b })
+    );
+    nozzle.position.set(0.45, -0.06, 0); nozzle.rotation.x = Math.PI; armElbow.add(nozzle);
+
+    const jetMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.055, 0.48, 12),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 })
+    );
+    jetMesh.position.set(0.45, -0.32, 0); jetMesh.visible = false; armElbow.add(jetMesh);
+
+    scene.add(rover);
+
+    // State + Telemetry Polling
+    let camPreset = 'CHASE';
+    let targetState = { rover: [0,0,0.17,0], joints: [0,-0.6,1.2,0,-0.6,0], dosing_active: false, trees: [] };
+
+    window.setCamPreset = (p) => {
+      camPreset = p;
+      document.getElementById('camChase').className = p === 'CHASE' ? 'btn-active' : '';
+      document.getElementById('camField').className = p === 'OVERVIEW' ? 'btn-active' : '';
+      document.getElementById('camFree').className = p === 'FREE' ? 'btn-active' : '';
+    };
+
+    window.sendCtrl = async (action, extra = {}) => {
       const res = await fetch('/sim/control', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({action, ...extra})
       });
       const st = await res.json();
-      renderState(st);
-    }
+      updateUI(st);
+    };
+    window.teleop = (linear, turn) => window.sendCtrl('teleop', {linear, turn});
 
-    function teleop(linear, turn) {
-      sendCtrl('teleop', {linear, turn});
-    }
-
-    function renderState(st) {
-      document.getElementById('liveBadge').innerText = st.estop ? '⛔ E-STOP' : (st.running ? '● LIVE RUNNING' : '⏸ PAUSED');
+    function updateUI(st) {
+      document.getElementById('liveBadge').innerText = st.estop ? '⛔ E-STOP' : (st.running ? '● 60 FPS WEBGL' : '⏸ PAUSED');
       document.getElementById('liveBadge').style.color = st.estop ? '#ef4444' : (st.running ? '#00e68a' : '#f59e0b');
       document.getElementById('stPhase').innerText = st.phase;
-      document.getElementById('stPos').innerText = `${st.rover_x_m.toFixed(2)} m`;
+      document.getElementById('stIbvs').innerText = `${(st.ibvs_error_cm || 0).toFixed(1)} cm`;
       document.getElementById('stS1').innerText = `${st.system1_conf}% / ${st.system1_ms}ms`;
       document.getElementById('stGate').innerText = st.gate_status;
       document.getElementById('progressText').innerText = `Tree ${st.current_tree} / ${st.total_trees} (${st.trees_poured} poured)`;
       document.getElementById('progressFill').style.width = `${(st.trees_poured / Math.max(1, st.total_trees)) * 100}%`;
-
+      document.getElementById('hudOverlay').innerHTML =
+        `PHASE: <strong style="color:#00e68a;">${st.phase}</strong> | x=${(st.rover_x_m ?? st.rover?.[0] ?? 0).toFixed(2)}m | IBVS: ${(st.ibvs_error_cm || 0).toFixed(1)} cm | Tree ${st.current_tree}/${st.total_trees}`;
       document.getElementById('btnAuto').className = st.mode === 'AUTO' ? 'btn-active' : '';
       document.getElementById('btnManual').className = st.mode === 'MANUAL' ? 'btn-active' : '';
-      document.getElementById('btnFollow').className = st.camera_view === 'FOLLOW' ? 'btn-active' : '';
-      document.getElementById('btnOverview').className = st.camera_view === 'OVERVIEW' ? 'btn-active' : '';
-
       const box = document.getElementById('logBox');
       box.innerHTML = (st.logs || []).map(l => `<div>${l}</div>`).join('');
       box.scrollTop = box.scrollHeight;
@@ -179,24 +369,62 @@
 
     setInterval(async () => {
       try {
-        const res = await fetch('/sim/state');
-        if (res.ok) renderState(await res.json());
+        const res = await fetch('/sim/telemetry');
+        if (res.ok) {
+          targetState = await res.json();
+          updateUI(targetState);
+          (targetState.trees || []).forEach((t, i) => {
+            if (treeRings[i]) treeRings[i].material.color.setHex(t.poured ? 0x00e68a : 0xf59e0b);
+          });
+        }
       } catch (_) {}
-    }, 300);
+    }, 50);
+
+    let frames = 0, lastFpsT = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+      const [rx, ry, rz, yaw] = targetState.rover || [0,0,0.17,0];
+      rover.position.lerp(new THREE.Vector3(rx, rz, -ry), 0.25);
+      rover.rotation.y += (yaw - rover.rotation.y) * 0.25;
+
+      const j = targetState.joints || [0,-0.6,1.2,0,-0.6,0];
+      armYaw.rotation.y += (j[0] - armYaw.rotation.y) * 0.25;
+      armShoulder.rotation.z += (-j[1] - armShoulder.rotation.z) * 0.25;
+      armElbow.rotation.z += (-j[2] - armElbow.rotation.z) * 0.25;
+      jetMesh.visible = Boolean(targetState.dosing_active);
+
+      if (camPreset === 'CHASE') {
+        controls.target.lerp(new THREE.Vector3(rover.position.x + 0.6, 0.4, rover.position.z - 0.3), 0.15);
+        camera.position.lerp(new THREE.Vector3(rover.position.x - 1.6, 1.35, rover.position.z + 1.25), 0.12);
+      } else if (camPreset === 'OVERVIEW') {
+        controls.target.lerp(new THREE.Vector3(7.5, 0.5, -0.5), 0.1);
+        camera.position.lerp(new THREE.Vector3(7.5, 6.2, 6.8), 0.1);
+      }
+      controls.update();
+      renderer.render(scene, camera);
+
+      frames++;
+      const now = performance.now();
+      if (now - lastFpsT >= 1000) {
+        document.getElementById('fpsTag').innerText = `${frames} FPS WebGL`;
+        frames = 0; lastFpsT = now;
+      }
+    }
+    animate();
 
     document.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const k = e.key.toLowerCase();
-      if (k === 'w' || k === 'arrowup') teleop(1, 0);
-      else if (k === 's' || k === 'arrowdown') teleop(-1, 0);
-      else if (k === 'a' || k === 'arrowleft') teleop(0, 1);
-      else if (k === 'd' || k === 'arrowright') teleop(0, -1);
-      else if (k === ' ') sendCtrl('pause');
-      else if (k === 'p') sendCtrl('manual_pour');
+      if (k === 'w' || k === 'arrowup') window.teleop(1, 0);
+      else if (k === 's' || k === 'arrowdown') window.teleop(-1, 0);
+      else if (k === 'a' || k === 'arrowleft') window.teleop(0, 1);
+      else if (k === 'd' || k === 'arrowright') window.teleop(0, -1);
+      else if (k === ' ') window.sendCtrl('pause');
+      else if (k === 'p') window.sendCtrl('manual_pour');
     });
     document.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
-      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) teleop(0, 0);
+      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) window.teleop(0, 0);
     });
   </script>
 </body>

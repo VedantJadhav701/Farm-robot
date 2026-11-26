@@ -21,6 +21,7 @@ import mujoco
 
 from src.perception.pomegranate_detector import PomegranateVisionDetector
 from src.control.kinematics import ArmKinematics
+from src.control.visual_servoing import EyeInHandVisualServo
 from src.control.target_tracker import TemporalTargetStabilizer
 from src.control.fertilizer_controller import FertilizerDosingController
 from src.api.llm_brain import DosingAuthorization
@@ -39,6 +40,7 @@ class LiveOrchardSimEngine:
             weights_path=weights, confidence_threshold=0.70, nms_conf=0.22
         )
         self.kin = ArmKinematics()
+        self.ibvs = EyeInHandVisualServo()
         self.tracker = TemporalTargetStabilizer(ema_alpha=0.28, max_jump_px=115.0)
         self.controller = FertilizerDosingController(db_path="output/dosing_audit_log.db")
         self.safety = ROS2ActuatorBridge()
@@ -60,8 +62,12 @@ class LiveOrchardSimEngine:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._latest_jpeg: Optional[bytes] = None
+        self._latest_onboard_jpeg: Optional[bytes] = None
         self._frame_seq = 0
         self._last_vision = None
+        self._dosing_active = False
+        self._ibvs_error_cm = 0.0
+        self._ibvs_aligned = False
 
         # Interactive control state
         self.running = True
@@ -192,6 +198,45 @@ class LiveOrchardSimEngine:
         with self._jpeg_lock:
             return self._latest_jpeg
 
+    def get_onboard_jpeg(self) -> Optional[bytes]:
+        with self._jpeg_lock:
+            return self._latest_onboard_jpeg
+
+    def get_3d_telemetry(self) -> Dict[str, Any]:
+        with self._lock:
+            qw, qx, qy, qz = [float(v) for v in self.data.qpos[3:7]]
+            yaw = float(np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz)))
+            joints = [round(float(v), 4) for v in self.data.ctrl[4:10]]
+            trees = [
+                {
+                    "id": i + 1,
+                    "x": round(tx + 0.2, 2),
+                    "y": 0.72,
+                    "poured": i < self.trees_poured,
+                }
+                for i, tx in enumerate(self.tree_x_targets)
+            ]
+            return {
+                "running": self.running,
+                "estop": self.estop,
+                "mode": self.mode,
+                "phase": self.phase,
+                "rover": [round(float(self.data.qpos[0]), 3), round(float(self.data.qpos[1]), 3), round(float(self.data.qpos[2]), 3), round(yaw, 4)],
+                "joints": joints,
+                "dosing_active": self._dosing_active,
+                "dose_ml": self.dose_ml,
+                "ibvs_error_cm": self._ibvs_error_cm,
+                "ibvs_aligned": self._ibvs_aligned,
+                "current_tree": min(self.tree_idx + 1, len(self.tree_x_targets)),
+                "total_trees": len(self.tree_x_targets),
+                "trees_poured": self.trees_poured,
+                "gate_status": self.gate_summary,
+                "system1_conf": round(self.last_conf * 100.0, 1),
+                "system1_ms": round(self.last_s1_ms, 1),
+                "trees": trees,
+                "logs": list(self.logs),
+            }
+
     def _render_one_frame_locked(self, step_physics: bool = True):
         rover_x = float(self.data.qpos[0])
         dosing_active = False
@@ -240,13 +285,16 @@ class LiveOrchardSimEngine:
                         self.phase_timer = 0
                 elif self.phase == "EXTEND_POUR":
                     self.data.ctrl[0:4] = 0.0
-                    t = min(1.0, self.phase_timer / 14.0)
-                    self.data.ctrl[4:10] = (1.0 - t) * self.home_q + t * self.pour_arm_q
+                    target_px = self._last_vision.trunk_base_pixel if self._last_vision is not None else (420, 390)
+                    ibvs_res = self.ibvs.step(self.data.ctrl[4:10], target_px, (480, 640))
+                    self.data.ctrl[4:10] = ibvs_res["next_q"]
+                    self._ibvs_error_cm = ibvs_res["error_cm"]
+                    self._ibvs_aligned = ibvs_res["aligned"]
                     if self.phase_timer >= 15:
                         dosing_active = True
                     if self.phase_timer >= 32:
                         self.trees_poured += 1
-                        self._log(f"[POUR] Tree #{self.tree_idx + 1}: {self.dose_ml:.0f} mL @ 12.5cm ring.")
+                        self._log(f"[POUR] Tree #{self.tree_idx + 1}: {self.dose_ml:.0f} mL @ 12.5cm (IBVS {self._ibvs_error_cm:.1f}cm).")
                         self.phase = "RETRACT"
                         self.phase_timer = 0
                 elif self.phase == "RETRACT":
@@ -311,11 +359,15 @@ class LiveOrchardSimEngine:
         cv2.putText(world_bgr, f"PHASE: {self.phase} | Poured: {self.trees_poured} | Safety: {self.gate_summary}",
                     (20, 64), cv2.FONT_HERSHEY_SIMPLEX, 0.52, status_col, 2)
 
+        self._dosing_active = dosing_active
         panel = np.hstack([world_bgr, onboard_ann])
         ok, buf = cv2.imencode(".jpg", panel, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        if ok:
-            with self._jpeg_lock:
+        ok_ob, buf_ob = cv2.imencode(".jpg", cv2.resize(onboard_ann, (400, 300)), [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+        with self._jpeg_lock:
+            if ok:
                 self._latest_jpeg = buf.tobytes()
+            if ok_ob:
+                self._latest_onboard_jpeg = buf_ob.tobytes()
 
     def _loop(self):
         while not self._stop_event.is_set():

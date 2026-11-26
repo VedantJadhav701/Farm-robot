@@ -269,6 +269,30 @@ def sim_state():
     return get_sim_engine().get_state()
 
 
+@app.get("/sim/telemetry")
+def sim_telemetry():
+    return get_sim_engine().get_3d_telemetry()
+
+
+@app.get("/sim/onboard_stream")
+def sim_onboard_stream():
+    eng = get_sim_engine()
+
+    def _gen():
+        last_jpg = None
+        while True:
+            jpg = eng.get_onboard_jpeg()
+            if jpg is not None and jpg is not last_jpg:
+                last_jpg = jpg
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
+                )
+            time.sleep(0.03)
+
+    return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+
 @app.post("/sim/control")
 def sim_control(req: SimControlRequest):
     eng = get_sim_engine()
