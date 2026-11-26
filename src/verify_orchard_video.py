@@ -67,7 +67,12 @@ def main():
         if vis.is_pomegranate:
             detected_frames += 1
 
-        t_state = tracker.update(vis.is_pomegranate, vis.trunk_base_pixel)
+        trunk_boxes = [
+            (*d.bbox_xyxy, d.confidence)
+            for d in vis.all_detections
+            if d.class_name == "trunk_base"
+        ]
+        t_state = tracker.update(vis.is_pomegranate, vis.trunk_base_pixel, trunk_boxes=trunk_boxes)
         if t_state["is_pouring"] and not was_pouring:
             pour_events += 1
         was_pouring = t_state["is_pouring"]
