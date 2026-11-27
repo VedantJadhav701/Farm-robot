@@ -274,11 +274,12 @@ class LiveOrchardSimEngine:
                         self.gate_summary = f"{sum(1 for g in res['gates'] if g['passed'])}/4 PASS"
                         auth = DosingAuthorization(
                             authorized=True,
-                            crop_species="Pomegranate (Punica granatum)",
-                            confidence_score=max(0.82, self.last_conf),
                             dose_volume_ml=self.dose_ml,
-                            valve_duration_sec=round(self.dose_ml / 250.0, 3),
-                            reasoning_summary=f"Tree #{self.tree_idx + 1} auto-verified in MuJoCo field.",
+                            pulse_duration_seconds=round(self.dose_ml / 250.0, 3),
+                            target_coordinates_m=(0.0, 0.72, -0.35),
+                            decision_reasoning=f"Tree #{self.tree_idx + 1} auto-verified in MuJoCo field.",
+                            crop_verified=True,
+                            confidence_score=max(0.82, self.last_conf),
                         )
                         self.controller.execute_liquid_dose(auth)
                         self.phase = "EXTEND_POUR"
