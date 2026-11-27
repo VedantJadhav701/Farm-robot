@@ -323,3 +323,13 @@ def sim_stream():
             time.sleep(0.015)
 
     return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+
+@app.get("/sim/assets/{filename}")
+def sim_asset(filename: str):
+    if filename not in ("orchard_turkey_web.ply", "orchard_3d_meta.json"):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    p = Path("output") / filename
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Asset not generated yet")
+    return FileResponse(str(p))

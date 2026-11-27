@@ -131,6 +131,7 @@
         <button id="camChase" class="btn-active" onclick="window.setCamPreset('CHASE')">📷 Chase</button>
         <button id="camField" onclick="window.setCamPreset('OVERVIEW')">🛰 Full Field</button>
         <button id="camFree" onclick="window.setCamPreset('FREE')">🌀 Free Orbit</button>
+        <button id="btnPly" class="btn-active" onclick="window.toggleRealWorld()">🌍 Real 3D World</button>
       </div>
 
       <label>Fertilizer Dose: <strong id="doseLabel" style="color:var(--cyan);">80 mL</strong> (12.5 cm ring)</label>
@@ -170,6 +171,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { PLYLoader } from 'three/addons/loaders/PLYLoader.js';
 
     const canvas = document.getElementById('webglCanvas');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -244,7 +246,7 @@
     const fruitMat = new THREE.MeshStandardMaterial({ color: 0xd91818, roughness: 0.35 });
     const treeRings = [];
 
-    function buildPomegranateTree(mjX, mjY, isTargetRow) {
+    function buildPomegranateTreeGroup(mjX, mjY, isTargetRow) {
       const g = new THREE.Group();
       g.position.set(mjX, 0.08, -mjY);
 
@@ -274,13 +276,42 @@
         g.add(ring);
         treeRings.push(ring);
       }
-      scene.add(g);
+      return g;
     }
 
+    const synthGroupHeaderDummy = null;
+
+    const synthGroup = new THREE.Group();
+    scene.add(synthGroup);
+
     const activeTreeXs = [1.4, 3.2, 5.0, 6.8, 8.6, 10.4, 12.2, 14.0];
-    activeTreeXs.forEach((x) => buildPomegranateTree(x, 0.72, true));
-    [1.8, 4.4, 7.0, 9.6, 12.2].forEach((x) => buildPomegranateTree(x, -1.25, false));
-    [2.2, 5.8, 9.4, 13.0].forEach((x) => buildPomegranateTree(x, 2.85, false));
+    activeTreeXs.forEach((x) => { const g = buildPomegranateTreeGroup(x, 0.72, true); synthGroup.add(g); });
+    [1.8, 4.4, 7.0, 9.6, 12.2].forEach((x) => synthGroup.add(buildPomegranateTreeGroup(x, -1.25, false)));
+    [2.2, 5.8, 9.4, 13.0].forEach((x) => synthGroup.add(buildPomegranateTreeGroup(x, 2.85, false)));
+
+    let realWorldCloud = null;
+    let showRealWorld = true;
+    new PLYLoader().load('/sim/assets/orchard_turkey_web.ply', (geom) => {
+      const mat = new THREE.PointsMaterial({ size: 0.055, sizeAttenuation: true, vertexColors: true });
+      realWorldCloud = new THREE.Points(geom, mat);
+      scene.add(realWorldCloud);
+      synthGroup.visible = false;
+      document.getElementById('btnPly').innerText = '🌍 Real 3D Orchard (Loaded)';
+    }, undefined, () => {
+      document.getElementById('btnPly').innerText = '🌳 Synthetic Field';
+      document.getElementById('btnPly').className = '';
+    });
+
+    window.toggleRealWorld = () => {
+      showRealWorld = !showRealWorld;
+      if (realWorldCloud) {
+        realWorldCloud.visible = showRealWorld;
+        synthGroup.visible = !showRealWorld;
+        document.getElementById('btnPly').className = showRealWorld ? 'btn-active' : '';
+      } else {
+        synthGroup.visible = true;
+      }
+    };
 
     // 4WD Rover + 6-DOF Arm
     const rover = new THREE.Group();

@@ -1,0 +1,18 @@
+{
+  "source": "orchard_turkey_480p.mp4 (118s-136s)",
+  "keyframes": 78,
+  "vertices": 662239,
+  "ply_mb": 9.47,
+  "bounds_x": [
+    -1.21,
+    34.08
+  ],
+  "bounds_y": [
+    -0.25,
+    3.6
+  ],
+  "bounds_z": [
+    -4.8,
+    4.8
+  ]
+}

@@ -8,6 +8,8 @@ runs/
 *.mp4
 *.db
 *.tar.gz
+*.tar
+*.ply
 *.log
 MUJOCO_LOG.TXT
 models/slm_lora/
