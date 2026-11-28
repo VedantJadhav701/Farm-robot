@@ -262,7 +262,62 @@ def generate_knowledge_qa_pairs(kb: Dict[str, Any]) -> List[Dict[str, Any]]:
         "qa_economics",
     ))
 
-    # 9. All 14 hard robot rules
+    # 9. Climate, weather, planting season, spacing & pruning
+    cw = kb.get("climate_and_weather", {})
+    if cw:
+        tc = cw["temperature_c"]
+        ans_cw = (
+            f"Climate: {cw['ideal_climate']} Optimal temperature: {tc['optimal_growth']}; "
+            f"cold tolerance: {tc['dormancy_cold_tolerance']}; heat/sunburn: {tc['heat_sunburn_threshold']}. "
+            f"Rainfall: {cw['rainfall_mm']} Humidity: {cw['humidity']} Sunlight: {cw['sunlight']}"
+        )
+        for q in [
+            "What weather, temperature, rainfall, and humidity does pomegranate need?",
+            "What is the ideal climate for growing pomegranate and when does sunburn or frost damage happen?",
+            "Anar ki kheti ke liye kaisa mausam, temperature aur barish chahiye?",
+        ]:
+            pairs.append(_msg(SYS_QA, q, ans_cw, "qa_climate"))
+
+    oe = kb.get("orchard_establishment_and_pruning", {})
+    if oe:
+        ans_oe = (
+            f"Planting season: {oe['planting_season']} Propagation: {oe['propagation']} "
+            f"Spacing & pit: {oe['spacing_m']} Training: {oe['training_system']} "
+            f"Pruning: {oe['pruning']}"
+        )
+        for q in [
+            "What is the best planting season, spacing, propagation method, and pruning system for pomegranate?",
+            "How should a new pomegranate orchard be planted and trained (multi-stem vs single-stem)?",
+            "Anar lagane ka sahi season aur spacing kya hai?",
+        ]:
+            pairs.append(_msg(SYS_QA, q, ans_oe, "qa_establishment"))
+
+    # Natural symptom-to-disease paraphrases (zero-RAG generalization)
+    pairs.append(_msg(
+        SYS_QA,
+        "A grower noticed oily water-soaked leaf spots and L-shaped fruit rind cracks during monsoon. What is it and should our robot pour liquid fertilizer on this tree?",
+        "This is Bacterial Blight (Xanthomonas axonopodis pv. punicae, critical severity). "
+        "Action: SKIP_DOSING — our robot MUST REJECT liquid dosing because wet canopy/splash spreads inoculum. "
+        "Treatment: Copper hydroxide 2 g/L or Kasugamycin 3 ml/L + prune and burn infected branches.",
+        "qa_disease_paraphrase",
+    ))
+    pairs.append(_msg(
+        SYS_QA,
+        "A pomegranate tree has sudden wilting branches and gummy exudate at the trunk base. Can the robot dose it?",
+        "This indicates Wilt (Ceratocystis fimbriata / Fusarium spp., critical severity). "
+        "Action: SKIP_DOSING — REJECT dosing immediately and alert the operator. "
+        "Treatment: Carbendazim 2 g/L soil drench (early stage) + Trichoderma viride 50 g/tree basin; remove dead trees.",
+        "qa_disease_paraphrase",
+    ))
+    pairs.append(_msg(
+        SYS_QA,
+        "Bhai flowering stage chal rahi hai, kya nitrogen ya urea de sakte hain? Kaunsa NPK aur kitna mL dose sahi rahega?",
+        "Flowering stage (25-35 days) mein nitrogen / urea BILKUL AVOID karein kyunki isse flower drop hota hai. "
+        "Sahi fertilizer: NPK 0:52:34 (MKP) @ 80 mL/tree every 10 days + Boron 0.2% spray (fruit set ke liye) + Calcium Nitrate 0.5% spray.",
+        "qa_hinglish_paraphrase",
+    ))
+
+    # 10. All 14 hard robot rules
     for r in kb["robot_decision_rules"]["rules"]:
         pairs.append(_msg(
             SYS_QA,

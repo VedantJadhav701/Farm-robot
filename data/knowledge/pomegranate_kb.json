@@ -433,6 +433,26 @@
     }
   },
 
+  "climate_and_weather": {
+    "ideal_climate": "Semi-arid to subtropical; hot dry summers with cool winters produce best fruit color and sweetness.",
+    "temperature_c": {
+      "optimal_growth": "25-35 C",
+      "dormancy_cold_tolerance": "Tolerates down to -5 C when dormant, but active shoots/flowers injured below 0 C",
+      "heat_sunburn_threshold": ">42 C causes fruit sun-scorch (use kaolin clay 3% spray or shade netting)"
+    },
+    "rainfall_mm": "500-750 mm/year ideal; >1000 mm or heavy monsoon rain during flowering/fruiting triggers severe bacterial blight and fruit cracking.",
+    "humidity": "Low-to-moderate relative humidity (40-65%) ideal; >80% RH favors Xanthomonas bacterial blight and Cercospora.",
+    "sunlight": "Full sun (>=6-8 hours/day) required for red aril/rind color and high Brix."
+  },
+
+  "orchard_establishment_and_pruning": {
+    "planting_season": "Jul-Aug (monsoon onset) or Feb-Mar (spring, with assured drip irrigation).",
+    "propagation": "Hardwood/semi-hardwood cuttings (15-20 cm, IBA 2000 ppm) or air-layering (gootee) from disease-free mother plants.",
+    "spacing_m": "4.5 x 3.0 m (740 trees/ha) or 4.0 x 2.5 m (1000 trees/ha) high-density; pit size 60 x 60 x 60 cm filled with topsoil + 20 kg FYM + Trichoderma.",
+    "training_system": "Multi-stem bush (3-4 main stems per plant) — safer against stem borer/wilt than single-stem.",
+    "pruning": "Light annual pruning after harvest/rest to remove water shoots, dead/diseased wood, and open center canopy for airflow and sunlight."
+  },
+
   "economics": {
     "yield_per_tree_kg": {
       "3rd_year": "5-8",
