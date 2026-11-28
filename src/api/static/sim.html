@@ -3,74 +3,105 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>60 FPS WebGL 3D Orchard Simulator + Eye-in-Hand Visual Servoing</title>
+  <title>Orchard Pilot — 60 FPS WebGL Digital Twin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #0b0f17;
-      --panel: #131a26;
-      --border: #243044;
-      --accent: #00e68a;
-      --cyan: #22d3ee;
-      --warn: #f59e0b;
-      --danger: #ef4444;
-      --text: #e5edf7;
-      --muted: #8fa3bf;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0f1a;
+      color: #e6edf7;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
-    * { box-sizing: border-box; font-family: Inter, system-ui, -apple-system, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 22px; background: #0f1520; border-bottom: 1px solid var(--border);
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .muted { color: #9fb0c7; }
+    .h {
+      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+      color: #9fb0c7; font-weight: 600; margin: 0;
     }
-    header h1 { margin: 0; font-size: 17px; color: var(--accent); }
-    .nav-btn {
-      color: var(--cyan); text-decoration: none; font-size: 13px;
-      border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px;
+    .bar {
+      display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.08); background: #0d1424; flex-wrap: wrap;
     }
-    .grid {
-      display: grid; grid-template-columns: 1fr 360px; gap: 16px;
-      padding: 14px 18px; max-width: 1680px; margin: 0 auto;
+    .main {
+      display: grid;
+      grid-template-columns: 255px minmax(0, 1fr) 300px;
+      gap: 14px;
+      padding: 14px 18px;
+      flex: 1;
     }
-    @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-    .viewport-wrap { position: relative; width: 100%; height: 540px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: #070b12; }
+    @media (max-width: 1180px) { .main { grid-template-columns: 1fr; } }
+    .panel {
+      background: #111a2e;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,.07); color: #e6edf7; border: 1px solid transparent;
+    }
+    .ok { background: rgba(52,211,153,.16); color: #6ee7b7; }
+    .warn { background: rgba(251,191,36,.16); color: #fcd34d; }
+    .bad { background: rgba(248,113,113,.16); color: #fca5a5; }
+    .cy { background: rgba(34,211,238,.16); color: #67e8f9; }
+    .row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,.03);
+    }
+    .cur { outline: 1px solid #22d3ee; background: rgba(34,211,238,.08); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #34d399; flex: none; display: inline-block; }
+    .dot.p { background: #475569; }
+    .dot.a { background: #fbbf24; }
+    .dot.c { background: #22d3ee; }
+    .dot.b { background: #f87171; }
+    .btn {
+      font: inherit; font-weight: 600; color: #e6edf7;
+      background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px; padding: 7px 12px; min-height: 36px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .btn:hover { border-color: rgba(34,211,238,.55); }
+    .btn.go { background: #059669; border-color: #10b981; color: #fff; }
+    .btn.pause { background: rgba(251,191,36,.16); border-color: rgba(251,191,36,.45); color: #fcd34d; }
+    .btn.stop { background: #b91c1c; border-color: #ef4444; font-weight: 700; color: #fff; }
+    .seg {
+      display: flex; gap: 2px; background: rgba(0,0,0,.42); padding: 3px; border-radius: 9px;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .seg .btn { border: 0; background: transparent; min-height: 30px; padding: 5px 11px; color: #9fb0c7; font-size: 12px; }
+    .seg .on { background: #1e2c4a; color: #fff; }
+    .viewport-wrap {
+      position: relative; border-radius: 12px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,.08); height: 505px; background: #0d1628;
+    }
     #webglCanvas { width: 100%; height: 100%; display: block; }
     .pip-cam {
-      position: absolute; bottom: 12px; left: 12px; width: 250px;
-      border: 2px solid var(--cyan); border-radius: 8px; overflow: hidden;
-      background: #05080d; box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      position: absolute; left: 12px; bottom: 12px; width: 245px;
+      background: rgba(10,15,26,.92); border: 1px solid rgba(34,211,238,.5);
+      border-radius: 10px; padding: 7px; box-shadow: 0 8px 24px rgba(0,0,0,.55);
     }
-    .pip-cam .pip-hdr { font-size: 10px; font-weight: 700; padding: 3px 8px; background: rgba(10,16,26,0.9); color: var(--cyan); }
-    .pip-cam img { width: 100%; display: block; }
-    .hud-pill {
-      position: absolute; top: 12px; left: 12px;
-      background: rgba(12,18,28,0.86); border: 1px solid var(--border);
-      padding: 7px 12px; border-radius: 8px; font-size: 12px; color: var(--text);
-    }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-    button {
-      cursor: pointer; border: 1px solid var(--border); background: #1a2436;
-      color: var(--text); padding: 8px 12px; border-radius: 7px; font-weight: 600; font-size: 12.5px;
-    }
-    button:hover { border-color: var(--cyan); }
-    .btn-start { background: #0d3b2b; border-color: var(--accent); color: var(--accent); }
-    .btn-pause { background: #3b2e0d; border-color: var(--warn); color: var(--warn); }
-    .btn-estop { background: #451217; border-color: var(--danger); color: #ff8080; }
-    .btn-active { background: #10324a; border-color: var(--cyan); color: var(--cyan); }
-    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
-    .stat { background: #0d131d; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
-    .stat .k { font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
-    .stat .v { font-size: 14.5px; font-weight: 700; margin-top: 2px; color: var(--text); }
-    .progress-bg { height: 9px; background: #0b1018; border-radius: 99px; overflow: hidden; border: 1px solid var(--border); }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--cyan)); width: 0%; transition: width 0.25s; }
-    .teleop { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+    .pip-cam img { width: 100%; border-radius: 6px; display: block; }
+    table { width: 100%; border-collapse: collapse; min-width: 540px; }
+    td, th { text-align: left; padding: 7px 9px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12px; }
+    th { color: #9fb0c7; font-weight: 600; }
+    .teleop { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+    .teleop .btn { min-height: 30px; padding: 4px 6px; font-size: 11.5px; }
     .logs {
-      background: #090d14; border: 1px solid var(--border); border-radius: 8px;
-      padding: 8px 10px; height: 145px; overflow-y: auto; font-family: monospace; font-size: 11px; color: #b7c8df;
+      background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.06); border-radius: 8px;
+      padding: 7px 9px; height: 78px; overflow-y: auto; font-size: 11px; color: #9fb0c7;
     }
-    .logs div { margin-bottom: 3px; }
-    label { font-size: 12px; color: var(--muted); display: block; margin-top: 6px; }
-    input[type="range"] { width: 100%; }
+    input[type="range"] { width: 100%; accent-color: #22d3ee; }
+    a.nav-link { color: #67e8f9; text-decoration: none; font-size: 12px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.12); }
   </style>
   <script type="importmap">
     {
@@ -82,89 +113,134 @@
   </script>
 </head>
 <body>
-  <header>
-    <h1>Physical AI 60 FPS WebGL 3D Orchard Simulator + Eye-in-Hand Visual Servoing</h1>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <span id="liveBadge" style="font-size:12px; color:#00e68a;">● 60 FPS WEBGL</span>
-      <a class="nav-btn" href="/">← Image & Voice Cockpit</a>
-    </div>
-  </header>
+  <div class="bar">
+    <strong style="font-size:15px">Orchard Pilot</strong>
+    <span class="muted">Pomegranate dosing · Row 04 · Digital twin</span>
+    <span id="statusChip" class="chip warn">AUTO · PAUSED · Tree 1 of 8</span>
+    <span style="flex:1"></span>
+    <span id="fpsTag" class="chip mono">60 Hz WebGL</span>
+    <span id="s1Chip" class="chip mono">S1 YOLO 0 ms</span>
+    <span id="s2Chip" class="chip mono">S2 idle</span>
+    <span id="missionTimer" class="chip mono">Mission 00:00</span>
+    <a class="nav-link" href="/">← Image & Voice</a>
+    <button class="btn stop" type="button" onclick="window.sendCtrl('estop')">E-STOP</button>
+  </div>
 
-  <div class="grid">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <strong style="font-size:13.5px;">Interactive 3D Orchard World (Drag to Orbit • Scroll to Zoom • W/A/S/D Drive)</strong>
-        <span id="fpsTag" style="font-size:12px; color:var(--accent);">60 FPS</span>
+  <div class="main">
+    <!-- LEFT DOCK: 8-Tree Mission Progress & Operator Command -->
+    <div class="panel">
+      <p class="h">Mission</p>
+      <div style="height:6px;border-radius:4px;background:rgba(255,255,255,.08)">
+        <div id="progressFill" style="width:0%;height:6px;border-radius:4px;background:#34d399;transition:width .25s"></div>
       </div>
+      <span id="progressSummary" class="muted" style="font-size:12px;">0 poured · 0 skipped · 0 active · 8 pending</span>
+      <div id="treeList" style="display:flex;flex-direction:column;gap:6px;"></div>
+
+      <p class="h" style="margin-top:6px">Operator command</p>
+      <div id="cmdBox" class="row" style="align-items:flex-start;line-height:1.45;font-size:12px;">
+        Pour 80 mL at the 12.5 cm root ring of every verified tree.
+      </div>
+    </div>
+
+    <!-- CENTER COLUMN: 3D WebGL Viewport + Audit Table -->
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
       <div class="viewport-wrap">
         <canvas id="webglCanvas"></canvas>
-        <div class="hud-pill" id="hudOverlay">
-          PHASE: <strong style="color:var(--accent);">DRIVE</strong> | IBVS: 0.0 cm | Tree 1/8
+
+        <div class="seg" style="position:absolute;top:12px;left:12px">
+          <button id="camChase" class="btn on" type="button" onclick="window.setCamPreset('CHASE')">Chase</button>
+          <button id="camFree" class="btn" type="button" onclick="window.setCamPreset('FREE')">Orbit</button>
+          <button id="camField" class="btn" type="button" onclick="window.setCamPreset('OVERVIEW')">Field</button>
         </div>
+
+        <div style="position:absolute;top:12px;right:12px;display:flex;gap:6px;align-items:center">
+          <button id="btnPly" class="chip cy" style="cursor:pointer" type="button" onclick="window.toggleRealWorld()">🌍 Real 3D Orchard</button>
+          <span class="chip" id="hudPosChip">x=0.00 m</span>
+        </div>
+
         <div class="pip-cam">
-          <div class="pip-hdr">ONBOARD PHASE 3 YOLO SENSOR</div>
+          <div class="muted" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px">
+            Onboard Cam · Phase 3 YOLO
+          </div>
           <img src="/sim/onboard_stream" alt="Onboard Phase 3 YOLO Feed" />
         </div>
-      </div>
-      <div style="margin-top:10px;">
-        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:4px;">
-          <span>Full-Field 8-Tree Row Progress</span>
-          <span id="progressText">Tree 1 / 8 (0 poured)</span>
+
+        <div id="servoBadge" class="chip ok" style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:6px 14px;font-size:12px">
+          Servo error 0.0 cm · standby
         </div>
-        <div class="progress-bg"><div id="progressFill" class="progress-fill"></div></div>
+      </div>
+
+      <div class="panel">
+        <p class="h">Audit log · every outcome recorded</p>
+        <div style="overflow-x:auto;max-height:185px;overflow-y:auto">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Tree</th><th>Outcome</th><th>Dose</th><th>Servo</th><th>Gates</th><th>S2</th></tr>
+            </thead>
+            <tbody id="auditBody">
+              <tr><td colspan="7" class="muted">Waiting for tree inspection...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="logBox" class="logs mono"></div>
       </div>
     </div>
 
-    <div class="card">
-      <strong style="font-size:14px;">Simulation Controls</strong>
-      <div class="row" style="margin-top:8px;">
-        <button class="btn-start" onclick="window.sendCtrl('start')">▶ Start / Resume</button>
-        <button class="btn-pause" onclick="window.sendCtrl('pause')">⏸ Pause</button>
-        <button class="btn-estop" onclick="window.sendCtrl('estop')">⛔ E-STOP</button>
-        <button onclick="window.sendCtrl('reset')">↺ Reset Field</button>
+    <!-- RIGHT DOCK: Independent Safety Supervisor, System 2, Controls & Sparkline -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="panel">
+        <p class="h">Safety supervisor · independent</p>
+        <div id="gatesList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <span class="muted" style="font-size:11px;line-height:1.4">
+          Fail-closed hardware gates. Only this layer opens the valve (normally closed, 2 s hardware clamp).
+        </span>
       </div>
 
-      <strong style="font-size:13px;">Mode & 3D Camera Presets</strong>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnAuto" class="btn-active" onclick="window.sendCtrl('mode', {mode:'AUTO'})">🤖 Auto</button>
-        <button id="btnManual" onclick="window.sendCtrl('mode', {mode:'MANUAL'})">🎮 Manual</button>
-        <button id="camChase" class="btn-active" onclick="window.setCamPreset('CHASE')">📷 Chase</button>
-        <button id="camField" onclick="window.setCamPreset('OVERVIEW')">🛰 Full Field</button>
-        <button id="camFree" onclick="window.setCamPreset('FREE')">🌀 Free Orbit</button>
-        <button id="btnPly" class="btn-active" onclick="window.toggleRealWorld()">🌍 Real 3D World</button>
+      <div class="panel">
+        <p class="h">System 2 · Qwen2.5-3B</p>
+        <div class="row"><span>Authorization</span><span id="s2AuthChip" class="chip">Standby</span></div>
+        <div class="row"><span class="muted">Valid for</span><span id="s2Valid" class="mono">—</span></div>
+        <div class="row"><span class="muted">Bound to frame</span><span id="s2Frame" class="mono">0</span></div>
       </div>
 
-      <label>Fertilizer Dose: <strong id="doseLabel" style="color:var(--cyan);">80 mL</strong> (12.5 cm ring)</label>
-      <input type="range" min="10" max="500" step="10" value="80"
-        oninput="document.getElementById('doseLabel').innerText=this.value+' mL'"
-        onchange="window.sendCtrl('dose', {dose_ml: Number(this.value)})" />
+      <div class="panel">
+        <p class="h">Controls</p>
+        <div style="display:flex;gap:6px">
+          <button class="btn go" type="button" style="flex:1" onclick="window.sendCtrl('start')">▶ Start</button>
+          <button class="btn pause" type="button" style="flex:1" onclick="window.sendCtrl('pause')">⏸ Pause</button>
+          <button class="btn" type="button" onclick="window.sendCtrl('reset')">↺ Reset</button>
+        </div>
+        <div class="seg">
+          <button id="btnAuto" class="btn on" type="button" style="flex:1" onclick="window.sendCtrl('mode', {mode:'AUTO'})">Auto</button>
+          <button id="btnManual" class="btn" type="button" style="flex:1" onclick="window.sendCtrl('mode', {mode:'MANUAL'})">Manual</button>
+        </div>
+        <label class="muted" for="dose">Dose · <strong id="doseLabel" style="color:#e6edf7">80 mL</strong> (12.5 cm ring)</label>
+        <input id="dose" type="range" min="10" max="500" step="10" value="80"
+          oninput="document.getElementById('doseLabel').innerText=this.value+' mL'"
+          onchange="window.sendCtrl('dose', {dose_ml: Number(this.value)})" />
 
-      <strong style="font-size:13px; display:block; margin-top:8px;">Manual Teleop & 6-DOF Arm</strong>
-      <div class="teleop">
-        <div></div>
-        <button onmousedown="window.teleop(1,0)" onmouseup="window.teleop(0,0)">▲ Forward</button>
-        <div></div>
-        <button onmousedown="window.teleop(0,1)" onmouseup="window.teleop(0,0)">◀ Left</button>
-        <button onclick="window.teleop(0,0)">■ Stop</button>
-        <button onmousedown="window.teleop(0,-1)" onmouseup="window.teleop(0,0)">▶ Right</button>
-        <div></div>
-        <button onmousedown="window.teleop(-1,0)" onmouseup="window.teleop(0,0)">▼ Reverse</button>
-        <div></div>
-      </div>
-      <div class="row" style="margin-top:6px;">
-        <button class="btn-active" style="flex:1;" onclick="window.sendCtrl('manual_pour')">💧 IBVS Pour</button>
-        <button style="flex:1;" onclick="window.sendCtrl('manual_retract')">↩ Retract Arm</button>
-      </div>
+        <div class="teleop">
+          <div></div>
+          <button class="btn" type="button" onmousedown="window.teleop(1,0)" onmouseup="window.teleop(0,0)">▲ Fwd</button>
+          <div></div>
+          <button class="btn" type="button" onmousedown="window.teleop(0,1)" onmouseup="window.teleop(0,0)">◀ L</button>
+          <button class="btn" type="button" onclick="window.teleop(0,0)">■</button>
+          <button class="btn" type="button" onmousedown="window.teleop(0,-1)" onmouseup="window.teleop(0,0)">▶ R</button>
+          <div></div>
+          <button class="btn" type="button" onmousedown="window.teleop(-1,0)" onmouseup="window.teleop(0,0)">▼ Rev</button>
+          <div></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" type="button" style="flex:1;font-size:12px" onclick="window.sendCtrl('manual_pour')">💧 Pour</button>
+          <button class="btn" type="button" style="flex:1;font-size:12px" onclick="window.sendCtrl('manual_retract')">↩ Retract</button>
+        </div>
 
-      <div class="stat-grid">
-        <div class="stat"><div class="k">Phase</div><div id="stPhase" class="v" style="font-size:12.5px;">DRIVE</div></div>
-        <div class="stat"><div class="k">IBVS Error</div><div id="stIbvs" class="v">0.0 cm</div></div>
-        <div class="stat"><div class="k">System 1 YOLO</div><div id="stS1" class="v">0% / 0ms</div></div>
-        <div class="stat"><div class="k">4-Gate Safety</div><div id="stGate" class="v" style="color:var(--accent);">4/4 ARMED</div></div>
+        <p class="h" style="margin-top:2px">Servo error (cm)</p>
+        <svg viewBox="0 0 260 56" style="width:100%;height:56px;background:rgba(0,0,0,.22);border-radius:6px;">
+          <line x1="0" y1="42" x2="260" y2="42" stroke="#34d399" stroke-dasharray="3 3" opacity=".55"></line>
+          <polyline id="errSpark" fill="none" stroke="#22d3ee" stroke-width="2" points="0,42 260,42"></polyline>
+        </svg>
       </div>
-
-      <strong style="font-size:13px;">Live Mission & Safety Audit</strong>
-      <div id="logBox" class="logs"></div>
     </div>
   </div>
 
@@ -183,7 +259,7 @@
     scene.background = new THREE.Color(0x9ac8f0);
     scene.fog = new THREE.Fog(0xb9daf5, 14, 38);
 
-    const camera = new THREE.PerspectiveCamera(55, 16/9, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 100);
     camera.position.set(-1.8, 1.4, 1.8);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -198,7 +274,6 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Lighting
     scene.add(new THREE.HemisphereLight(0xdff2ff, 0x5d432c, 0.85));
     const sun = new THREE.DirectionalLight(0xfff4de, 1.35);
     sun.position.set(8, 14, -8);
@@ -208,7 +283,6 @@
     sun.shadow.camera.top = 12; sun.shadow.camera.bottom = -12;
     scene.add(sun);
 
-    // Coordinate mapping: MuJoCo (x forward, y left, z up) -> Three.js (X=x, Y=z, Z=-y)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(50, 30),
       new THREE.MeshStandardMaterial({ color: 0x7a5638, roughness: 0.95 })
@@ -217,7 +291,6 @@
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Raised beds & grass verges
     const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c3d24, roughness: 0.95 });
     const grassMat = new THREE.MeshStandardMaterial({ color: 0x356e24, roughness: 0.9 });
     [-1.25, 0.75, 2.85].forEach((mjY) => {
@@ -231,15 +304,7 @@
       gr.position.set(7.5, 0.005, -mjY);
       scene.add(gr);
     });
-    const drip = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.012, 19, 8),
-      new THREE.MeshStandardMaterial({ color: 0x16181d })
-    );
-    drip.rotation.z = Math.PI / 2;
-    drip.position.set(7.5, 0.09, -0.70);
-    scene.add(drip);
 
-    // Multi-stem Pomegranate Tree builder
     const barkMat = new THREE.MeshStandardMaterial({ color: 0x5a3b26, roughness: 0.9 });
     const leafMat1 = new THREE.MeshStandardMaterial({ color: 0x246b22, roughness: 0.85 });
     const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x185217, roughness: 0.88 });
@@ -249,23 +314,18 @@
     function buildPomegranateTreeGroup(mjX, mjY, isTargetRow) {
       const g = new THREE.Group();
       g.position.set(mjX, 0.08, -mjY);
-
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.052, 0.55, 10), barkMat);
       trunk.position.y = 0.27; trunk.castShadow = true; g.add(trunk);
-
       const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.50, 8), barkMat);
       branch.position.set(0.08, 0.32, 0.05); branch.rotation.z = -0.35; g.add(branch);
-
       [[0, 0.95, 0, 0.36], [-0.14, 0.84, 0.08, 0.28], [0.16, 0.88, -0.06, 0.30]].forEach(([x,y,z,r], idx) => {
         const c = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), idx % 2 ? leafMat2 : leafMat1);
         c.position.set(x, y, z); c.scale.set(1.1, 0.85, 1.0); c.castShadow = true; g.add(c);
       });
-
       [[-0.20, 0.70, 0.24], [0.06, 0.82, 0.26], [0.20, 0.75, 0.20]].forEach(([x,y,z]) => {
         const f = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), fruitMat);
         f.position.set(x, y, z); f.castShadow = true; g.add(f);
       });
-
       if (isTargetRow) {
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(0.11, 0.15, 24),
@@ -279,27 +339,61 @@
       return g;
     }
 
-    const synthGroupHeaderDummy = null;
-
     const synthGroup = new THREE.Group();
     scene.add(synthGroup);
-
-    const activeTreeXs = [1.4, 3.2, 5.0, 6.8, 8.6, 10.4, 12.2, 14.0];
-    activeTreeXs.forEach((x) => { const g = buildPomegranateTreeGroup(x, 0.72, true); synthGroup.add(g); });
+    [1.4, 3.2, 5.0, 6.8, 8.6, 10.4, 12.2, 14.0].forEach((x) => synthGroup.add(buildPomegranateTreeGroup(x, 0.72, true)));
     [1.8, 4.4, 7.0, 9.6, 12.2].forEach((x) => synthGroup.add(buildPomegranateTreeGroup(x, -1.25, false)));
     [2.2, 5.8, 9.4, 13.0].forEach((x) => synthGroup.add(buildPomegranateTreeGroup(x, 2.85, false)));
 
+    // Real 3D Orchard Point Cloud with soft circular splats + ground clip (y >= 0.15 m)
     let realWorldCloud = null;
     let showRealWorld = true;
     new PLYLoader().load('/sim/assets/orchard_turkey_web.ply', (geom) => {
-      const mat = new THREE.PointsMaterial({ size: 0.055, sizeAttenuation: true, vertexColors: true });
-      realWorldCloud = new THREE.Points(geom, mat);
+      const posAttr = geom.getAttribute('position');
+      const colAttr = geom.getAttribute('color');
+      const keptPos = [];
+      const keptCol = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        const y = posAttr.getY(i);
+        if (y >= 0.15) {
+          keptPos.push(posAttr.getX(i), y, posAttr.getZ(i));
+          keptCol.push(colAttr.getX(i), colAttr.getY(i), colAttr.getZ(i));
+        }
+      }
+      const cleanGeom = new THREE.BufferGeometry();
+      cleanGeom.setAttribute('position', new THREE.Float32BufferAttribute(keptPos, 3));
+      cleanGeom.setAttribute('color', new THREE.Float32BufferAttribute(keptCol, 3));
+
+      const splatMat = new THREE.ShaderMaterial({
+        uniforms: { uSize: { value: 68.0 } },
+        vertexColors: true,
+        transparent: true,
+        depthWrite: true,
+        vertexShader: `
+          uniform float uSize;
+          varying vec3 vC;
+          void main() {
+            vC = color;
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = clamp(uSize / max(0.5, -mv.z), 2.0, 22.0);
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          varying vec3 vC;
+          void main() {
+            vec2 p = gl_PointCoord * 2.0 - 1.0;
+            float r = dot(p, p);
+            if (r > 1.0) discard;
+            gl_FragColor = vec4(vC * (1.0 - 0.30 * r), 1.0);
+          }`
+      });
+      realWorldCloud = new THREE.Points(cleanGeom, splatMat);
       scene.add(realWorldCloud);
       synthGroup.visible = false;
-      document.getElementById('btnPly').innerText = '🌍 Real 3D Orchard (Loaded)';
+      document.getElementById('btnPly').innerText = '🌍 Real 3D Orchard (Splats)';
     }, undefined, () => {
       document.getElementById('btnPly').innerText = '🌳 Synthetic Field';
-      document.getElementById('btnPly').className = '';
+      document.getElementById('btnPly').className = 'chip';
     });
 
     window.toggleRealWorld = () => {
@@ -307,7 +401,8 @@
       if (realWorldCloud) {
         realWorldCloud.visible = showRealWorld;
         synthGroup.visible = !showRealWorld;
-        document.getElementById('btnPly').className = showRealWorld ? 'btn-active' : '';
+        document.getElementById('btnPly').className = showRealWorld ? 'chip cy' : 'chip';
+        document.getElementById('btnPly').innerText = showRealWorld ? '🌍 Real 3D Orchard (Splats)' : '🌳 Synthetic Field';
       } else {
         synthGroup.visible = true;
       }
@@ -317,7 +412,7 @@
     const rover = new THREE.Group();
     const chassis = new THREE.Mesh(
       new THREE.BoxGeometry(0.90, 0.24, 0.60),
-      new THREE.MeshStandardMaterial({ color: 0x232933, roughness: 0.5 })
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45 })
     );
     chassis.castShadow = true; rover.add(chassis);
     const tank = new THREE.Mesh(
@@ -326,7 +421,7 @@
     );
     tank.rotation.x = Math.PI / 2; tank.position.set(-0.22, 0.24, 0); rover.add(tank);
 
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.9 });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
     [[0.28, -0.02, -0.36], [0.28, -0.02, 0.36], [-0.28, -0.02, -0.36], [-0.28, -0.02, 0.36]].forEach(([x,y,z]) => {
       const w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.12, 16), wheelMat);
       w.rotation.x = Math.PI / 2; w.position.set(x, y, z); w.castShadow = true; rover.add(w);
@@ -353,21 +448,20 @@
 
     const jetMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(0.008, 0.055, 0.48, 12),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 })
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78 })
     );
     jetMesh.position.set(0.45, -0.32, 0); jetMesh.visible = false; armElbow.add(jetMesh);
-
     scene.add(rover);
 
-    // State + Telemetry Polling
     let camPreset = 'CHASE';
     let targetState = { rover: [0,0,0.17,0], joints: [0,-0.6,1.2,0,-0.6,0], dosing_active: false, trees: [] };
+    const errHistory = [];
 
     window.setCamPreset = (p) => {
       camPreset = p;
-      document.getElementById('camChase').className = p === 'CHASE' ? 'btn-active' : '';
-      document.getElementById('camField').className = p === 'OVERVIEW' ? 'btn-active' : '';
-      document.getElementById('camFree').className = p === 'FREE' ? 'btn-active' : '';
+      document.getElementById('camChase').className = p === 'CHASE' ? 'btn on' : 'btn';
+      document.getElementById('camFree').className = p === 'FREE' ? 'btn on' : 'btn';
+      document.getElementById('camField').className = p === 'OVERVIEW' ? 'btn on' : 'btn';
     };
 
     window.sendCtrl = async (action, extra = {}) => {
@@ -375,26 +469,87 @@
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({action, ...extra})
       });
-      const st = await res.json();
-      updateUI(st);
+      if (res.ok) updateUI(await res.json());
     };
     window.teleop = (linear, turn) => window.sendCtrl('teleop', {linear, turn});
 
+    function fmtTime(sec) {
+      const s = Math.max(0, Math.floor(sec || 0));
+      return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    }
+
     function updateUI(st) {
-      document.getElementById('liveBadge').innerText = st.estop ? '⛔ E-STOP' : (st.running ? '● 60 FPS WEBGL' : '⏸ PAUSED');
-      document.getElementById('liveBadge').style.color = st.estop ? '#ef4444' : (st.running ? '#00e68a' : '#f59e0b');
-      document.getElementById('stPhase').innerText = st.phase;
-      document.getElementById('stIbvs').innerText = `${(st.ibvs_error_cm || 0).toFixed(1)} cm`;
-      document.getElementById('stS1').innerText = `${st.system1_conf}% / ${st.system1_ms}ms`;
-      document.getElementById('stGate').innerText = st.gate_status;
-      document.getElementById('progressText').innerText = `Tree ${st.current_tree} / ${st.total_trees} (${st.trees_poured} poured)`;
-      document.getElementById('progressFill').style.width = `${(st.trees_poured / Math.max(1, st.total_trees)) * 100}%`;
-      document.getElementById('hudOverlay').innerHTML =
-        `PHASE: <strong style="color:#00e68a;">${st.phase}</strong> | x=${(st.rover_x_m ?? st.rover?.[0] ?? 0).toFixed(2)}m | IBVS: ${(st.ibvs_error_cm || 0).toFixed(1)} cm | Tree ${st.current_tree}/${st.total_trees}`;
-      document.getElementById('btnAuto').className = st.mode === 'AUTO' ? 'btn-active' : '';
-      document.getElementById('btnManual').className = st.mode === 'MANUAL' ? 'btn-active' : '';
+      const chip = document.getElementById('statusChip');
+      chip.innerText = `${st.mode} · ${st.phase} · Tree ${st.current_tree} of ${st.total_trees}`;
+      chip.className = 'chip ' + (st.estop ? 'bad' : (st.running ? 'ok' : 'warn'));
+
+      document.getElementById('s1Chip').innerText = `S1 YOLO ${(st.system1_ms || 0).toFixed(0)} ms`;
+      document.getElementById('missionTimer').innerText = `Mission ${fmtTime(st.mission_elapsed_s)}`;
+      document.getElementById('hudPosChip').innerText = `x=${(st.rover_x_m ?? st.rover?.[0] ?? 0).toFixed(2)} m`;
+      if (st.command_text) document.getElementById('cmdBox').innerText = st.command_text;
+
+      // Tree list
+      const trees = st.trees || [];
+      let poured = 0, skipped = 0, active = 0, pending = 0;
+      document.getElementById('treeList').innerHTML = trees.map((t) => {
+        const s = t.status || (t.poured ? 'poured' : 'pending');
+        if (s === 'poured') poured++; else if (s === 'skipped') skipped++; else if (s === 'active') active++; else pending++;
+        const dotCls = s === 'poured' ? 'dot' : (s === 'skipped' ? 'dot a' : (s === 'active' ? 'dot c' : 'dot p'));
+        const badgeCls = s === 'poured' ? 'chip ok' : (s === 'skipped' ? 'chip warn' : (s === 'active' ? 'chip cy' : 'chip'));
+        const badgeTxt = s === 'poured' ? `${(t.dose_ml || st.dose_ml || 80).toFixed(0)} mL` : (s === 'skipped' ? 'Skipped' : (s === 'active' ? st.phase : 'Pending'));
+        return `<div class="row ${s === 'active' ? 'cur' : ''}"><span><span class="${dotCls}"></span>&nbsp; Tree ${t.id}</span><span class="${badgeCls}">${badgeTxt}</span></div>`;
+      }).join('');
+      const donePct = ((poured + skipped) / Math.max(1, st.total_trees)) * 100;
+      document.getElementById('progressFill').style.width = `${donePct}%`;
+      document.getElementById('progressSummary').innerText = `${poured} poured · ${skipped} skipped · ${active} active · ${pending} pending`;
+
+      // Servo badge & sparkline
+      const err = Number(st.ibvs_error_cm || 0);
+      const sb = document.getElementById('servoBadge');
+      sb.innerText = `Servo error ${err.toFixed(1)} cm · ${st.ibvs_aligned ? 'aligned' : (st.running ? 'tracking' : 'standby')}`;
+      sb.className = 'chip ' + (st.ibvs_aligned ? 'ok' : (err > 10 ? 'warn' : 'cy'));
+
+      errHistory.push(Math.min(35, err));
+      if (errHistory.length > 26) errHistory.shift();
+      if (errHistory.length >= 2) {
+        const pts = errHistory.map((v, i) => {
+          const x = (i / (errHistory.length - 1)) * 260;
+          const y = 52 - (v / 35) * 46;
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        document.getElementById('errSpark').setAttribute('points', pts);
+      }
+
+      // Safety gates
+      if (st.gates) {
+        document.getElementById('gatesList').innerHTML = st.gates.map((g) => {
+          const d = g.state === 'ok' ? 'dot' : (g.state === 'bad' ? 'dot b' : (g.state === 'active' ? 'dot c' : 'dot p'));
+          return `<div class="row"><span><span class="${d}"></span>&nbsp; ${g.id} ${g.label}</span><span class="mono muted" style="font-size:11px">${g.detail}</span></div>`;
+        }).join('');
+      }
+
+      // System 2 card
+      if (st.s2_info) {
+        document.getElementById('s2Chip').innerText = `S2 ${st.s2_info.backend}`;
+        const ac = document.getElementById('s2AuthChip');
+        ac.innerText = st.s2_info.authorized ? `Tree ${st.s2_info.tree_id} · ${st.s2_info.conf.toFixed(2)}` : 'Standby';
+        ac.className = 'chip ' + (st.s2_info.authorized ? 'ok' : '');
+        document.getElementById('s2Valid').innerText = st.s2_info.authorized ? `${st.s2_info.valid_for_s.toFixed(1)} s` : '—';
+        document.getElementById('s2Frame').innerText = String(st.s2_info.frame_id || 0);
+      }
+
+      // Audit table
+      if (st.audit_rows && st.audit_rows.length) {
+        document.getElementById('auditBody').innerHTML = st.audit_rows.map((r) => {
+          const cls = r.outcome === 'Completed' ? 'ok' : (r.outcome === 'Skipped' ? 'warn' : 'cy');
+          return `<tr><td class="mono">${r.time}</td><td>${r.tree}</td><td><span class="chip ${cls}">${r.outcome}</span></td><td class="mono">${r.dose_ml} mL</td><td class="mono">${r.servo_cm} cm</td><td class="mono">${r.gates}</td><td class="mono">${r.s2_conf}</td></tr>`;
+        }).join('');
+      }
+
+      document.getElementById('btnAuto').className = st.mode === 'AUTO' ? 'btn on' : 'btn';
+      document.getElementById('btnManual').className = st.mode === 'MANUAL' ? 'btn on' : 'btn';
       const box = document.getElementById('logBox');
-      box.innerHTML = (st.logs || []).map(l => `<div>${l}</div>`).join('');
+      box.innerHTML = (st.logs || []).map((l) => `<div>${l}</div>`).join('');
       box.scrollTop = box.scrollHeight;
     }
 
@@ -405,11 +560,15 @@
           targetState = await res.json();
           updateUI(targetState);
           (targetState.trees || []).forEach((t, i) => {
-            if (treeRings[i]) treeRings[i].material.color.setHex(t.poured ? 0x00e68a : 0xf59e0b);
+            if (treeRings[i]) {
+              treeRings[i].material.color.setHex(
+                t.status === 'poured' ? 0x34d399 : (t.status === 'skipped' ? 0xf87171 : (t.status === 'active' ? 0x22d3ee : 0xf59e0b))
+              );
+            }
           });
         }
       } catch (_) {}
-    }, 50);
+    }, 65);
 
     let frames = 0, lastFpsT = performance.now();
     function animate() {
@@ -437,7 +596,7 @@
       frames++;
       const now = performance.now();
       if (now - lastFpsT >= 1000) {
-        document.getElementById('fpsTag').innerText = `${frames} FPS WebGL`;
+        document.getElementById('fpsTag').innerText = `${frames} Hz WebGL`;
         frames = 0; lastFpsT = now;
       }
     }
@@ -450,7 +609,8 @@
       else if (k === 's' || k === 'arrowdown') window.teleop(-1, 0);
       else if (k === 'a' || k === 'arrowleft') window.teleop(0, 1);
       else if (k === 'd' || k === 'arrowright') window.teleop(0, -1);
-      else if (k === ' ') window.sendCtrl('pause');
+      else if (k === ' ') window.sendCtrl(targetState.running ? 'pause' : 'start');
+      else if (k === 'r') window.sendCtrl('reset');
       else if (k === 'p') window.sendCtrl('manual_pour');
     });
     document.addEventListener('keyup', (e) => {

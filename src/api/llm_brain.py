@@ -16,15 +16,18 @@ Regardless of backend, deterministic hardware safety gates ALWAYS enforce:
 import json
 import logging
 import re
+import time
 import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import Optional, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from src.perception.pomegranate_detector import CropDetectionResult
 
 logger = logging.getLogger(__name__)
+
+SAFETY_MIN_CONF = 0.80
 
 
 class OperatorIntent(BaseModel):
@@ -33,6 +36,11 @@ class OperatorIntent(BaseModel):
     dose_volume_ml: float = Field(default=100.0, ge=10.0, le=500.0)
     min_confidence: float = Field(default=0.85, ge=0.5, le=1.0)
     action_type: str = "fertilize"
+
+    @field_validator("min_confidence")
+    @classmethod
+    def _enforce_safety_floor(cls, v: float) -> float:
+        return max(SAFETY_MIN_CONF, v)
 
 
 class DosingAuthorization(BaseModel):
@@ -44,6 +52,17 @@ class DosingAuthorization(BaseModel):
     crop_verified: bool
     confidence_score: float
     slm_backend: str = "rule_fallback"
+    issued_at: float = Field(default_factory=time.monotonic)
+    frame_id: int = 0
+    tree_id: Optional[int] = None
+
+    def is_valid(self, tree_id: Optional[int] = None, ttl_s: float = 2.0) -> bool:
+        """Check whether authorization is still fresh and bound to the active tree."""
+        if not self.authorized:
+            return False
+        if tree_id is not None and self.tree_id != tree_id:
+            return False
+        return (time.monotonic() - self.issued_at) <= ttl_s
 
 
 SYSTEM_PROMPT_INTENT = (
@@ -212,16 +231,18 @@ class LLMBrainSupervisor:
         self,
         intent: OperatorIntent,
         vision_result: CropDetectionResult,
+        tree_id: Optional[int] = None,
+        frame_id: int = 0,
     ) -> DosingAuthorization:
         """
         Cognitive decision gate with hard safety invariants:
-        1. Rejects dosing if crop is not verified as Pomegranate.
-        2. Rejects dosing if vision confidence < min_confidence.
+        1. Rejects dosing if target crop intent is not pomegranate or crop is not verified.
+        2. Rejects dosing if vision confidence < min_confidence (>= 0.80 floor).
         3. Optionally enriches reasoning via System 2 SLM.
         4. Calculates exact solenoid pulse duration: T = Volume / FlowRate.
         """
-        # Hard Safety Gate 1: Crop Identity
-        if not vision_result.is_pomegranate:
+        # Hard Safety Gate 1: Crop Identity & Intent
+        if intent.target_crop != "pomegranate" or not vision_result.is_pomegranate:
             return DosingAuthorization(
                 authorized=False,
                 dose_volume_ml=0.0,
@@ -234,10 +255,13 @@ class LLMBrainSupervisor:
                 crop_verified=False,
                 confidence_score=vision_result.confidence,
                 slm_backend=self.backend,
+                frame_id=frame_id,
+                tree_id=tree_id,
             )
 
         # Hard Safety Gate 2: Confidence Threshold
-        if vision_result.confidence < intent.min_confidence:
+        eff_min_conf = max(SAFETY_MIN_CONF, intent.min_confidence)
+        if vision_result.confidence < eff_min_conf:
             return DosingAuthorization(
                 authorized=False,
                 dose_volume_ml=0.0,
@@ -245,11 +269,13 @@ class LLMBrainSupervisor:
                 target_coordinates_m=(0.0, 0.0, 0.0),
                 decision_reasoning=(
                     f"ABORTED: Vision confidence ({vision_result.confidence:.2f}) "
-                    f"below threshold ({intent.min_confidence:.2f})."
+                    f"below threshold ({eff_min_conf:.2f})."
                 ),
                 crop_verified=True,
                 confidence_score=vision_result.confidence,
                 slm_backend=self.backend,
+                frame_id=frame_id,
+                tree_id=tree_id,
             )
 
         # Optional SLM supervision check (can veto on semantic grounds, never override a reject)
@@ -273,6 +299,8 @@ class LLMBrainSupervisor:
                         crop_verified=True,
                         confidence_score=vision_result.confidence,
                         slm_backend=self.backend,
+                        frame_id=frame_id,
+                        tree_id=tree_id,
                     )
                 if slm_parsed.get("reasoning"):
                     slm_note = f" | SLM: {slm_parsed['reasoning']}"
@@ -294,4 +322,6 @@ class LLMBrainSupervisor:
             crop_verified=True,
             confidence_score=vision_result.confidence,
             slm_backend=self.backend,
+            frame_id=frame_id,
+            tree_id=tree_id,
         )

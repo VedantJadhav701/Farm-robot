@@ -9,16 +9,18 @@ Production API layer for the Physical AI Dual-Brain:
   - Actuation: FertilizerDosingController + SQLite audit log
 """
 
+import asyncio
 import base64
+from contextlib import closing
 import sqlite3
 import time
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Literal
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.perception.pomegranate_detector import PomegranateVisionDetector
 from src.perception.depth_localizer import MonocularDepthLocalizer
@@ -90,7 +92,7 @@ def list_sample_images():
 def get_sample_file(path: str):
     p = Path(path).resolve()
     allowed = Path("data/real_test_samples").resolve()
-    if not str(p).startswith(str(allowed)) or not p.exists():
+    if not p.is_relative_to(allowed) or not p.exists():
         raise HTTPException(status_code=404, detail="Sample not found")
     return FileResponse(str(p))
 
@@ -117,7 +119,7 @@ def set_operator_command(req: CommandRequest):
 
 
 @app.post("/inspect-and-authorize")
-async def inspect_and_authorize(
+def inspect_and_authorize(
     file: UploadFile = File(...),
     execute_actuation: bool = Form(default=True),
     use_depth_3d: bool = Form(default=True),
@@ -129,7 +131,7 @@ async def inspect_and_authorize(
     valve_closed_confirmed: bool = Form(default=True),
 ):
     s = get_components()
-    raw = await file.read()
+    raw = file.file.read()
     arr = np.frombuffer(raw, np.uint8)
     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if frame is None:
@@ -222,17 +224,16 @@ async def inspect_and_authorize(
 
 
 @app.get("/audit-log")
-def get_audit_log(limit: int = 10):
+def get_audit_log(limit: int = Query(default=10, ge=1, le=500)):
     db_path = Path("output/dosing_audit_log.db")
     if not db_path.exists():
         return {"records": []}
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT * FROM dosing_transactions ORDER BY id DESC LIMIT ?", (limit,)
-    ).fetchall()
-    conn.close()
-    return {"records": [dict(r) for r in rows]}
+    with closing(sqlite3.connect(str(db_path))) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM dosing_transactions ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return {"records": [dict(r) for r in rows]}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -248,12 +249,15 @@ def get_sim_engine() -> LiveOrchardSimEngine:
 
 
 class SimControlRequest(BaseModel):
-    action: str
+    action: Literal[
+        "start", "pause", "estop", "reset", "mode", "camera",
+        "dose", "teleop", "manual_pour", "manual_retract"
+    ]
     mode: Optional[str] = None
     camera_view: Optional[str] = None
-    dose_ml: Optional[float] = None
-    linear: Optional[float] = 0.0
-    turn: Optional[float] = 0.0
+    dose_ml: Optional[float] = Field(default=None, ge=10.0, le=500.0)
+    linear: Optional[float] = Field(default=0.0, ge=-1.0, le=1.0)
+    turn: Optional[float] = Field(default=0.0, ge=-1.0, le=1.0)
 
 
 @app.get("/sim", response_class=HTMLResponse)
@@ -275,12 +279,12 @@ def sim_telemetry():
 
 
 @app.get("/sim/onboard_stream")
-def sim_onboard_stream():
+async def sim_onboard_stream(request: Request):
     eng = get_sim_engine()
 
-    def _gen():
+    async def _gen():
         last_jpg = None
-        while True:
+        while not await request.is_disconnected():
             jpg = eng.get_onboard_jpeg()
             if jpg is not None and jpg is not last_jpg:
                 last_jpg = jpg
@@ -288,7 +292,7 @@ def sim_onboard_stream():
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
                 )
-            time.sleep(0.03)
+            await asyncio.sleep(0.03)
 
     return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
@@ -307,12 +311,12 @@ def sim_control(req: SimControlRequest):
 
 
 @app.get("/sim/stream")
-def sim_stream():
+async def sim_stream(request: Request):
     eng = get_sim_engine()
 
-    def _gen():
+    async def _gen():
         last_jpg = None
-        while True:
+        while not await request.is_disconnected():
             jpg = eng.get_latest_jpeg()
             if jpg is not None and jpg is not last_jpg:
                 last_jpg = jpg
@@ -320,7 +324,7 @@ def sim_stream():
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
                 )
-            time.sleep(0.015)
+            await asyncio.sleep(0.015)
 
     return StreamingResponse(_gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 

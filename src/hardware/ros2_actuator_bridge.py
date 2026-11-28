@@ -66,7 +66,7 @@ class ROS2ActuatorBridge:
             self._pub = self._ros_node.create_publisher(String, "/dual_brain/actuation_frame", 10)
             self.mode = "ros2"
             logger.info(f"[Bridge] ROS2 node '{self.node_name}' active.")
-        except ImportError:
+        except Exception:
             self.mode = "dry_run_sim"
 
     def _publish(self, frame: HardwareActuationFrame):
@@ -107,7 +107,16 @@ class ROS2ActuatorBridge:
     # ── Gate 3: Flow-Sensor & Valve-Closure Verification ────────────────────
     @staticmethod
     def verify_delivery_and_valve(expected_ml: float, tel: SafetyTelemetry) -> Dict[str, Any]:
-        measured = expected_ml if tel.measured_flow_ml is None else tel.measured_flow_ml
+        if tel.measured_flow_ml is None:
+            return {
+                "gate": "3_valve_and_flow_verification",
+                "passed": False,
+                "expected_ml": expected_ml,
+                "measured_ml": None,
+                "valve_closed": tel.valve_closed_confirmed,
+                "reason": "NO_FLOW_SENSOR: cannot verify delivery",
+            }
+        measured = tel.measured_flow_ml
         flow_ok = abs(measured - expected_ml) <= max(5.0, expected_ml * 0.15)
         ok = flow_ok and tel.valve_closed_confirmed
         return {
