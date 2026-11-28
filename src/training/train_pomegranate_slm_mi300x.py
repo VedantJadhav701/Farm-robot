@@ -179,42 +179,58 @@ def main():
         r=32,
         lora_alpha=64,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-        lora_dropout=0.05,
+        lora_dropout=0.10,
         bias="none",
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, lora_cfg)
     model.print_trainable_parameters()
 
-    print(f"[2/4] Tokenizing dataset: {args.train_file}")
+    print(f"[2/4] Tokenizing train & validation datasets...")
     raw_ds = load_dataset("json", data_files=args.train_file, split="train")
     tok_ds = raw_ds.map(
         lambda ex: tokenize_with_assistant_mask(ex, tokenizer, args.max_length),
         remove_columns=raw_ds.column_names,
+    )
+    eval_raw = load_dataset("json", data_files=args.eval_file, split="train")
+    eval_tok = eval_raw.map(
+        lambda ex: tokenize_with_assistant_mask(ex, tokenizer, args.max_length),
+        remove_columns=eval_raw.column_names,
     )
 
     train_args = TrainingArguments(
         output_dir=str(out_dir / "checkpoints"),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
         gradient_accumulation_steps=1,
         learning_rate=args.lr,
+        weight_decay=0.05,
         lr_scheduler_type="cosine",
-        warmup_steps=60,
+        warmup_steps=40,
         max_grad_norm=1.0,
+        neftune_noise_alpha=5.0,
         bf16=True,
         fp16=False,
         logging_steps=25,
-        save_strategy="no",
+        eval_strategy="steps",
+        eval_steps=50,
+        save_strategy="steps",
+        save_steps=50,
+        save_total_limit=2,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
         report_to="none",
         dataloader_num_workers=4,
     )
 
-    print("[3/4] Starting LoRA training on MI300X...")
+    print("[3/4] Starting NEFTune + Eval-Loss Early-Stop LoRA training on MI300X...")
     trainer = Trainer(
         model=model,
         args=train_args,
         train_dataset=tok_ds,
+        eval_dataset=eval_tok,
         data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100),
     )
     train_res = trainer.train()

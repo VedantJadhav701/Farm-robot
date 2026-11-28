@@ -326,6 +326,41 @@ def generate_knowledge_qa_pairs(kb: Dict[str, Any]) -> List[Dict[str, Any]]:
             "qa_rules",
         ))
 
+    # 11. Honest AI (arXiv:2410.09699) — Abstention / Knowledge Boundary examples
+    abstention_prompts = [
+        ("What is the exact NPK dosing schedule for banana and sugarcane?",
+         "I am specialized exclusively in Pomegranate (Punica granatum) agronomy and do not have verified dosing protocols for banana or sugarcane."),
+        ("What fertilizer dose should we apply to cotton crops in Gujarat?",
+         "I do not have verified agronomic data for cotton. My knowledge base and safety gates are strictly scoped to Pomegranate (Punica granatum)."),
+        ("What was the exact rainfall in Solapur yesterday?",
+         "I do not have access to live or historical weather measurements for a specific date. I can only advise on pomegranate's general rainfall requirement (500-750 mm/year)."),
+        ("What is the market price of Alphonso mango per kg?",
+         "I do not have market pricing data for mango. I only have reference market grades and pricing ranges for pomegranate."),
+        ("Can the robot spray a custom unapproved chemical X-99 on pomegranate?",
+         "I do not have verified safety or efficacy data for 'chemical X-99'. Do not apply unverified chemicals; consult a certified agronomist."),
+    ]
+    for q_abs, a_abs in abstention_prompts:
+        pairs.append(_msg(SYS_QA, q_abs, a_abs, "qa_abstention"))
+
+    # Additional diverse paraphrases for weather, planting & diseases (no exact duplicates)
+    pairs.extend([
+        _msg(
+            SYS_QA,
+            "If summer heat crosses 43 C in Maharashtra or heavy monsoon rain hits during flowering, what happens to pomegranate and how do we protect it?",
+            "Above 42 C, pomegranate suffers fruit sun-scorch (protect with 3% kaolin clay spray or shade netting). "
+            "Heavy monsoon rain (>1000 mm or >80% humidity) during flowering/fruiting triggers severe bacterial blight and fruit cracking; "
+            "switch to Ambe or Hasta bahar and avoid overhead irrigation.",
+            "qa_climate_paraphrase",
+        ),
+        _msg(
+            SYS_QA,
+            "Should I train a new pomegranate sapling with 1 trunk or 3-4 stems, and what pit size should I dig?",
+            "Train as a multi-stem bush with 3-4 main stems per plant (safer against stem borer and wilt than single-stem). "
+            "Dig 60 x 60 x 60 cm pits at 4.5 x 3.0 m spacing (or 4.0 x 2.5 m high-density) filled with topsoil + 20 kg FYM + Trichoderma.",
+            "qa_establishment_paraphrase",
+        ),
+    ])
+
     return pairs
 
 
@@ -561,10 +596,10 @@ def main():
 
     kb = json.loads(Path(args.kb).read_text(encoding="utf-8"))
     qa_pairs = generate_knowledge_qa_pairs(kb)
-    # Upsample Q&A slightly so the model memorizes every single agronomy detail solidly
-    qa_train = qa_pairs * 8
-    dec_all = generate_decision_v2_examples(kb, args.decision_count, seed=42)
-    int_all = generate_intent_examples(args.intent_count, seed=123)
+    # Use 2x max (not 8x) to prevent exact-string memorization & overfitting
+    qa_train = qa_pairs * 2
+    dec_all = generate_decision_v2_examples(kb, 2400, seed=42)
+    int_all = generate_intent_examples(500, seed=123)
 
     # Fixed held-out eval split (deterministic, never seen in train)
     eval_qa = qa_pairs[:25]
