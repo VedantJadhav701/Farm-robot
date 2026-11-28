@@ -16,4 +16,6 @@ models/slm_lora/
 models/.cache/
 data/real_test_samples/
 data/slm_agri_instruct.jsonl
+data/slm_pomegranate_*.jsonl
+output/crop_records/*.tmp
 700_plant_automated_base_dosing_robot_execution_plan.md

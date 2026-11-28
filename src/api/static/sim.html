@@ -136,6 +136,9 @@
       <span id="progressSummary" class="muted" style="font-size:12px;">0 poured · 0 skipped · 0 active · 8 pending</span>
       <div id="treeList" style="display:flex;flex-direction:column;gap:6px;"></div>
 
+      <p class="h" style="margin-top:6px">Field Map · Row R01</p>
+      <div id="fieldMapStrip" style="display:flex;align-items:center;justify-content:space-between;gap:4px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.06)"></div>
+
       <p class="h" style="margin-top:6px">Operator command</p>
       <div id="cmdBox" class="row" style="align-items:flex-start;line-height:1.45;font-size:12px;">
         Pour 80 mL at the 12.5 cm root ring of every verified tree.
@@ -197,10 +200,21 @@
       </div>
 
       <div class="panel">
-        <p class="h">System 2 · Qwen2.5-3B</p>
+        <p class="h">System 2 · Qwen2.5-3B + Pomegranate KB</p>
         <div class="row"><span>Authorization</span><span id="s2AuthChip" class="chip">Standby</span></div>
+        <div class="row"><span class="muted">Active Crop ID</span><span id="s2CropId" class="mono">—</span></div>
         <div class="row"><span class="muted">Valid for</span><span id="s2Valid" class="mono">—</span></div>
         <div class="row"><span class="muted">Bound to frame</span><span id="s2Frame" class="mono">0</span></div>
+        <div id="agroCtxBox" class="muted" style="font-size:11px;line-height:1.4;background:rgba(0,0,0,.22);padding:6px 8px;border-radius:6px;max-height:68px;overflow-y:auto">
+          Agronomy context ready.
+        </div>
+        <div style="display:flex;gap:5px;margin-top:2px">
+          <input id="kbQueryInput" type="text" placeholder="Ask pomegranate brain (e.g. flowering NPK)..."
+            style="flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:5px 8px;color:#e6edf7;font-size:11.5px"
+            onkeydown="if(event.key==='Enter')window.askKnowledge()" />
+          <button class="btn" type="button" style="min-height:30px;padding:4px 9px;font-size:11.5px" onclick="window.askKnowledge()">Ask</button>
+        </div>
+        <div id="kbAnswerBox" class="muted" style="display:none;font-size:11px;line-height:1.4;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);padding:6px 8px;border-radius:6px;max-height:86px;overflow-y:auto;color:#e6edf7"></div>
       </div>
 
       <div class="panel">
@@ -473,6 +487,44 @@
     };
     window.teleop = (linear, turn) => window.sendCtrl('teleop', {linear, turn});
 
+    window.inspectCrop = async (cropId) => {
+      if (!cropId) return;
+      try {
+        const res = await fetch(`/crop/${encodeURIComponent(cropId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const c = data.crop;
+        const box = document.getElementById('kbAnswerBox');
+        box.style.display = 'block';
+        box.innerText = `${c.crop_id} [${c.status}] @ (${c.position_m.join(', ')})m · Stage: ${c.growth_stage} · Fruits: ${c.fruit_count_estimate} · Dosed: ${c.total_dose_ml} mL (${c.total_doses_count}x) · Health: ${(c.health_score*100).toFixed(0)}%`;
+      } catch (_) {}
+    };
+
+    window.askKnowledge = async () => {
+      const inp = document.getElementById('kbQueryInput');
+      const q = (inp.value || '').trim();
+      if (!q) return;
+      const box = document.getElementById('kbAnswerBox');
+      box.style.display = 'block';
+      box.innerText = 'Querying pomegranate knowledge brain...';
+      try {
+        const res = await fetch('/knowledge/query', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ question: q, crop_id: targetState.active_crop_id || null })
+        });
+        if (!res.ok) { box.innerText = 'Query failed.'; return; }
+        const data = await res.json();
+        if (data.slm_answer) {
+          box.innerText = `[${data.slm_backend}] ${data.slm_answer}`;
+        } else {
+          box.innerText = JSON.stringify(data.matched_kb).slice(0, 360);
+        }
+      } catch (e) {
+        box.innerText = 'Error querying knowledge base.';
+      }
+    };
+
     function fmtTime(sec) {
       const s = Math.max(0, Math.floor(sec || 0));
       return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -488,7 +540,7 @@
       document.getElementById('hudPosChip').innerText = `x=${(st.rover_x_m ?? st.rover?.[0] ?? 0).toFixed(2)} m`;
       if (st.command_text) document.getElementById('cmdBox').innerText = st.command_text;
 
-      // Tree list
+      // Tree list + 2D Field Map Strip
       const trees = st.trees || [];
       let poured = 0, skipped = 0, active = 0, pending = 0;
       document.getElementById('treeList').innerHTML = trees.map((t) => {
@@ -497,8 +549,18 @@
         const dotCls = s === 'poured' ? 'dot' : (s === 'skipped' ? 'dot a' : (s === 'active' ? 'dot c' : 'dot p'));
         const badgeCls = s === 'poured' ? 'chip ok' : (s === 'skipped' ? 'chip warn' : (s === 'active' ? 'chip cy' : 'chip'));
         const badgeTxt = s === 'poured' ? `${(t.dose_ml || st.dose_ml || 80).toFixed(0)} mL` : (s === 'skipped' ? 'Skipped' : (s === 'active' ? st.phase : 'Pending'));
-        return `<div class="row ${s === 'active' ? 'cur' : ''}"><span><span class="${dotCls}"></span>&nbsp; Tree ${t.id}</span><span class="${badgeCls}">${badgeTxt}</span></div>`;
+        const shortCid = t.crop_id ? t.crop_id.split('-').pop() : `T${t.id}`;
+        return `<div class="row ${s === 'active' ? 'cur' : ''}" style="cursor:pointer" onclick="window.inspectCrop('${t.crop_id || ''}')" title="Click to inspect CropRecord"><span><span class="${dotCls}"></span>&nbsp; T${t.id} <span class="mono muted" style="font-size:10.5px">${shortCid}</span></span><span class="${badgeCls}">${badgeTxt}</span></div>`;
       }).join('');
+
+      const fmEl = document.getElementById('fieldMapStrip');
+      if (fmEl) {
+        fmEl.innerHTML = trees.map((t) => {
+          const s = t.status || 'pending';
+          const bg = s === 'poured' ? '#34d399' : (s === 'skipped' ? '#f87171' : (s === 'active' ? '#22d3ee' : '#475569'));
+          return `<div title="${t.crop_id || 'Tree ' + t.id} (${t.x}m, ${t.y}m) · ${s}" onclick="window.inspectCrop('${t.crop_id || ''}')" style="cursor:pointer;width:22px;height:22px;border-radius:50%;background:${bg};color:#0a0f1a;font-weight:700;font-size:10px;display:flex;align-items:center;justify-content:center;border:${s === 'active' ? '2px solid #fff' : 'none'}">${t.id}</div>`;
+        }).join('');
+      }
       const donePct = ((poured + skipped) / Math.max(1, st.total_trees)) * 100;
       document.getElementById('progressFill').style.width = `${donePct}%`;
       document.getElementById('progressSummary').innerText = `${poured} poured · ${skipped} skipped · ${active} active · ${pending} pending`;
@@ -534,8 +596,12 @@
         const ac = document.getElementById('s2AuthChip');
         ac.innerText = st.s2_info.authorized ? `Tree ${st.s2_info.tree_id} · ${st.s2_info.conf.toFixed(2)}` : 'Standby';
         ac.className = 'chip ' + (st.s2_info.authorized ? 'ok' : '');
+        document.getElementById('s2CropId').innerText = st.active_crop_id || st.s2_info.crop_id || '—';
         document.getElementById('s2Valid').innerText = st.s2_info.authorized ? `${st.s2_info.valid_for_s.toFixed(1)} s` : '—';
         document.getElementById('s2Frame').innerText = String(st.s2_info.frame_id || 0);
+      }
+      if (st.agro_context) {
+        document.getElementById('agroCtxBox').innerText = st.agro_context;
       }
 
       // Audit table

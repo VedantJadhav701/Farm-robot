@@ -13,20 +13,31 @@ real-time user controls:
 import os
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import cv2
 import numpy as np
 import mujoco
 
-from src.perception.pomegranate_detector import PomegranateVisionDetector
+from src.perception.pomegranate_detector import PomegranateVisionDetector, CropDetectionResult
 from src.control.kinematics import ArmKinematics
 from src.control.visual_servoing import EyeInHandVisualServo
 from src.control.target_tracker import TemporalTargetStabilizer
 from src.control.fertilizer_controller import FertilizerDosingController
 from src.api.llm_brain import LLMBrainSupervisor, OperatorIntent, DosingAuthorization
 from src.hardware.ros2_actuator_bridge import ROS2ActuatorBridge, SafetyTelemetry
+from src.memory import (
+    CropMemoryStore,
+    CropRegistry,
+    CropRecord,
+    CropStatus,
+    GrowthStage,
+    DoseEvent,
+)
+from src.memory.field_map import FieldMap, MissionPlanner
+from src.brain import PomegranateKnowledgeBase
+from src.brain.decision_maker import EnhancedDecisionMaker
 
 
 class LiveOrchardSimEngine:
@@ -68,6 +79,19 @@ class LiveOrchardSimEngine:
         self.tree_x_targets = [1.20, 3.00, 4.80, 6.60, 8.40, 10.20, 12.00, 13.80]
         self.home_q = self.kin.home_q.copy()
         self.pour_arm_q = np.array([1.45, 0.95, -0.55, 0.0, -0.45, 0.0], dtype=np.float64)
+
+        # Persistent Crop Memory, Field Map, Agronomy KB & Brain v2
+        self.memory_store = CropMemoryStore(
+            db_path="output/crop_memory.db", json_dir="output/crop_records"
+        )
+        self.crop_registry = CropRegistry(field_id="F01", memory_store=self.memory_store)
+        self.field_map = FieldMap.from_tree_positions("F01", self.tree_x_targets, row_y=0.72, row_id="R01")
+        self.knowledge = PomegranateKnowledgeBase(kb_path="data/knowledge/pomegranate_kb.json")
+        self.decision_maker = EnhancedDecisionMaker(brain=self.brain, knowledge=self.knowledge)
+        self.planner: Optional[MissionPlanner] = None
+        self.tree_crop_ids: List[str] = []
+        self.active_crop_id: Optional[str] = None
+        self._last_agro_context: str = ""
 
         self._lock = threading.Lock()
         self._jpeg_lock = threading.Lock()
@@ -111,7 +135,62 @@ class LiveOrchardSimEngine:
         self.last_s1_ms = 0.0
         self.logs: List[str] = ["[SIM] 8-tree MuJoCo world ready (PAUSED). Click Start to begin."]
 
-        self.reset_simulation(keep_running=False)
+        self.reset_simulation(keep_running=False, clear_memory=False)
+
+    def _export_field_geojson_locked(self):
+        try:
+            out_dir = Path("output/field_maps")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            crops = self.memory_store.get_all_by_field("F01")
+            geojson = self.field_map.to_geojson(crops)
+            import json as _json
+            (out_dir / "F01_map.geojson").write_text(
+                _json.dumps(geojson, indent=2), encoding="utf-8"
+            )
+        except Exception as e:
+            self._log(f"[MEM] GeoJSON export warning: {e}")
+
+    def _init_field_memory_locked(self, clear_existing: bool = False):
+        if clear_existing:
+            self.crop_registry.reset()
+        self.field_map = FieldMap.from_tree_positions(
+            "F01", self.tree_x_targets, row_y=0.72, row_id="R01"
+        )
+        existing = {c.crop_id: c for c in self.memory_store.get_all_by_field("F01")}
+        crop_ids: List[str] = []
+        for i, tx in enumerate(self.tree_x_targets):
+            pos = (round(tx + 0.2, 2), 0.72, 0.0)
+            matched = self.memory_store.find_nearest(pos, radius_m=0.50)
+            if matched is None:
+                matched = self.crop_registry.register_or_update(
+                    position_3d_m=pos,
+                    detections=[],
+                    frame_id=self._frame_seq,
+                    row_id="R01",
+                    confidence=0.85,
+                )
+                matched.status = CropStatus.QUEUED
+                matched.growth_stage = GrowthStage.FRUITING
+                self.memory_store.save(matched)
+            crop_ids.append(matched.crop_id)
+            if matched.status in (CropStatus.DOSED, CropStatus.COMPLETED):
+                self.tree_statuses[i] = "poured"
+                self.tree_doses[i] = matched.total_dose_ml
+                self.trees_poured += 1
+            elif matched.status == CropStatus.SKIPPED:
+                self.tree_statuses[i] = "skipped"
+                self.trees_skipped += 1
+        self.tree_crop_ids = crop_ids
+        self.field_map.rows[0].crop_ids = crop_ids
+        self.planner = MissionPlanner(self.field_map, self.memory_store)
+        self.planner.plan_mission("row_sequential")
+        self.active_crop_id = crop_ids[0] if crop_ids else None
+        self._last_agro_context = (
+            self.knowledge.build_context_for_slm(self.memory_store.get(self.active_crop_id))
+            if self.active_crop_id and self.memory_store.get(self.active_crop_id)
+            else ""
+        )
+        self._export_field_geojson_locked()
 
     @staticmethod
     def _default_gates() -> List[Dict[str, Any]]:
@@ -147,7 +226,7 @@ class LiveOrchardSimEngine:
         if len(self.audit_rows) > 30:
             self.audit_rows = self.audit_rows[:30]
 
-    def reset_simulation(self, keep_running: bool = False):
+    def reset_simulation(self, keep_running: bool = False, clear_memory: bool = True):
         with self._lock:
             mujoco.mj_resetData(self.model, self.data)
             self.data.ctrl[4:10] = self.home_q
@@ -173,7 +252,8 @@ class LiveOrchardSimEngine:
             self.manual_turn = 0.0
             self.manual_arm_pour = False
             self.running = keep_running
-            self._log("[SIM] Field reset to Row Start (x=0.0m, 8 trees queued).")
+            self._init_field_memory_locked(clear_existing=clear_memory)
+            self._log("[SIM] Field reset to Row Start (x=0.0m, 8 trees queued in CropMemory).")
             if self._thread is not None and threading.current_thread() is self._thread:
                 self._render_one_frame_locked(step_physics=False)
 
@@ -230,8 +310,60 @@ class LiveOrchardSimEngine:
                 self._log("[MANUAL] Retracting arm to home pose.")
 
         if action == "reset":
-            self.reset_simulation(keep_running=False)
+            clear_mem = bool(kwargs.get("clear_memory", True))
+            self.reset_simulation(keep_running=False, clear_memory=clear_mem)
         return self.get_state()
+
+    def _export_field_geojson_locked(self):
+        try:
+            out_dir = Path("output/field_maps")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            crops = self.memory_store.get_all_by_field("F01")
+            geojson = self.field_map.to_geojson(crops)
+            import json as _json
+            (out_dir / "F01_map.geojson").write_text(
+                _json.dumps(geojson, indent=2), encoding="utf-8"
+            )
+        except Exception as e:
+            self._log(f"[MEM] GeoJSON export warning: {e}")
+
+    def _init_field_memory_locked(self, clear_existing: bool = False):
+        if clear_existing:
+            self.crop_registry.reset()
+        self.field_map = FieldMap.from_tree_positions(
+            "F01", self.tree_x_targets, row_y=0.72, row_id="R01"
+        )
+        crop_ids: List[str] = []
+        for i, tx in enumerate(self.tree_x_targets):
+            pos = (round(tx + 0.2, 2), 0.72, 0.0)
+            matched = self.memory_store.find_nearest(pos, radius_m=0.50)
+            if matched is None:
+                matched = self.crop_registry.register_or_update(
+                    position_3d_m=pos,
+                    detections=[],
+                    frame_id=self._frame_seq,
+                    row_id="R01",
+                    confidence=0.85,
+                )
+                matched.status = CropStatus.QUEUED
+                matched.growth_stage = GrowthStage.FRUITING
+                self.memory_store.save(matched)
+            crop_ids.append(matched.crop_id)
+            if matched.status in (CropStatus.DOSED, CropStatus.COMPLETED):
+                self.tree_statuses[i] = "poured"
+                self.tree_doses[i] = matched.total_dose_ml
+                self.trees_poured += 1
+            elif matched.status == CropStatus.SKIPPED:
+                self.tree_statuses[i] = "skipped"
+                self.trees_skipped += 1
+        self.tree_crop_ids = crop_ids
+        self.field_map.rows[0].crop_ids = crop_ids
+        self.planner = MissionPlanner(self.field_map, self.memory_store)
+        self.planner.plan_mission("row_sequential")
+        self.active_crop_id = crop_ids[0] if crop_ids else None
+        first_crop = self.memory_store.get(self.active_crop_id) if self.active_crop_id else None
+        self._last_agro_context = self.knowledge.build_context_for_slm(first_crop) if first_crop else ""
+        self._export_field_geojson_locked()
 
     def _compute_rover_telemetry_locked(self) -> SafetyTelemetry:
         speed = float(np.hypot(self.data.qvel[0], self.data.qvel[1]))
@@ -292,23 +424,32 @@ class LiveOrchardSimEngine:
             qw, qx, qy, qz = [float(v) for v in self.data.qpos[3:7]]
             yaw = float(np.arctan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz)))
             joints = [round(float(v), 4) for v in self.data.ctrl[4:10]]
-            trees = [
-                {
+            crops_by_id = {c.crop_id: c for c in self.memory_store.get_all_by_field("F01")}
+            trees = []
+            for i, tx in enumerate(self.tree_x_targets):
+                cid = self.tree_crop_ids[i] if i < len(self.tree_crop_ids) else f"F01-R01-C{i+1:04d}"
+                crec = crops_by_id.get(cid)
+                trees.append({
                     "id": i + 1,
+                    "crop_id": cid,
                     "x": round(tx + 0.2, 2),
                     "y": 0.72,
                     "status": self.tree_statuses[i],
                     "poured": self.tree_statuses[i] == "poured",
                     "dose_ml": self.tree_doses[i],
-                }
-                for i, tx in enumerate(self.tree_x_targets)
-            ]
+                    "growth_stage": crec.growth_stage.value if crec else "unknown",
+                    "fruit_count": crec.fruit_count_estimate if crec else 0,
+                    "health_score": crec.health_score if crec else 1.0,
+                    "disease_flags": crec.disease_flags if crec else [],
+                    "total_doses_count": crec.total_doses_count if crec else 0,
+                })
             auth = self._active_auth
             s2_info = {
                 "backend": self.brain.backend,
                 "model": self.brain.ollama_model if self.brain.backend == "ollama" else self.brain.backend,
                 "authorized": bool(auth and auth.authorized),
                 "tree_id": auth.tree_id if auth else None,
+                "crop_id": self.active_crop_id,
                 "conf": round(auth.confidence_score, 2) if auth else 0.0,
                 "valid_for_s": round(max(0.0, 5.0 - (time.monotonic() - auth.issued_at)), 1) if auth else 0.0,
                 "frame_id": auth.frame_id if auth else self._frame_seq,
@@ -327,6 +468,10 @@ class LiveOrchardSimEngine:
                 "ibvs_error_cm": self._ibvs_error_cm,
                 "ibvs_aligned": self._ibvs_aligned,
                 "current_tree": min(self.tree_idx + 1, len(self.tree_x_targets)),
+                "active_crop_id": self.active_crop_id,
+                "agro_context": self._last_agro_context,
+                "field_summary": self.memory_store.get_field_summary("F01"),
+                "mission_progress": self.planner.get_progress() if self.planner else {},
                 "total_trees": len(self.tree_x_targets),
                 "trees_poured": self.trees_poured,
                 "trees_skipped": self.trees_skipped,
@@ -354,14 +499,27 @@ class LiveOrchardSimEngine:
                 if self.phase == "DRIVE":
                     self.data.ctrl[4:10] = self.home_q
                     if self.tree_idx < len(self.tree_x_targets):
-                        self.tree_statuses[self.tree_idx] = "active"
-                        if rover_x < self.tree_x_targets[self.tree_idx]:
-                            self.data.ctrl[0:4] = self.DRIVE_CTRL
-                        else:
-                            self.data.ctrl[0:4] = -0.4 * self.DRIVE_CTRL if self.data.qvel[0] > 0.05 else 0.0
-                            self.phase = "VERIFY"
+                        cid = self.tree_crop_ids[self.tree_idx] if self.tree_idx < len(self.tree_crop_ids) else None
+                        self.active_crop_id = cid
+                        crec = self.memory_store.get(cid) if cid else None
+                        if crec and (crec.status in (CropStatus.DOSED, CropStatus.COMPLETED) or crec.was_dosed_today()):
+                            self.tree_statuses[self.tree_idx] = "poured"
+                            self.tree_doses[self.tree_idx] = crec.total_dose_ml
+                            self._log(f"[MEMORY] {cid} already dosed — skipping repeat visit.")
+                            self.tree_idx += 1
                             self.phase_timer = 0
-                            self._active_auth = None
+                        else:
+                            self.tree_statuses[self.tree_idx] = "active"
+                            if crec and crec.status != CropStatus.APPROACHING:
+                                crec.status = CropStatus.APPROACHING
+                                self.memory_store.save(crec)
+                            if rover_x < self.tree_x_targets[self.tree_idx]:
+                                self.data.ctrl[0:4] = self.DRIVE_CTRL
+                            else:
+                                self.data.ctrl[0:4] = -0.4 * self.DRIVE_CTRL if self.data.qvel[0] > 0.05 else 0.0
+                                self.phase = "VERIFY"
+                                self.phase_timer = 0
+                                self._active_auth = None
                     else:
                         self.data.ctrl[0:4] = 0.0
                         self.phase = "FIELD COMPLETE"
@@ -375,33 +533,52 @@ class LiveOrchardSimEngine:
                         "detail": f"{tel.rover_speed_mps:.2f} m/s · {abs(tel.imu_roll_deg):.1f}°",
                     }
                     if t_sec >= self.T_VERIFY:
+                        cid = self.tree_crop_ids[self.tree_idx] if self.tree_idx < len(self.tree_crop_ids) else None
+                        crec = self.memory_store.get(cid) if cid else None
+                        if crec is not None:
+                            crec.status = CropStatus.INSPECTING
+                            assessed = self.knowledge.assess_growth_stage(
+                                fruit_count=crec.fruit_count_estimate,
+                                flower_count=crec.flower_count_estimate,
+                                canopy_density=crec.canopy_density,
+                                month=datetime.now().month,
+                            )
+                            try:
+                                crec.growth_stage = GrowthStage(assessed)
+                            except ValueError:
+                                crec.growth_stage = GrowthStage.FRUITING
+                            self.memory_store.save(crec)
+                            self._last_agro_context = self.knowledge.build_context_for_slm(crec)
+
                         vision_for_s2 = self._last_vision
-                        # In synthetic MuJoCo scene, allow System 2 evaluation if vision ran
+                        if vision_for_s2 is None or not vision_for_s2.is_pomegranate:
+                            # Synthetic MuJoCo tree visual proxy when synthetic sphere leaves don't trigger YOLO
+                            vision_for_s2 = CropDetectionResult(
+                                is_pomegranate=True,
+                                confidence=max(0.84, self.last_conf),
+                                species_name="Pomegranate (Punica granatum)",
+                                trunk_base_pixel=(420, 390),
+                                target_3d_offset_m=(0.0, 0.72, -0.35),
+                                canopy_bounding_box=(260, 180, 220, 260),
+                                soil_contact_point=(420, 420),
+                                inference_ms=self.last_s1_ms,
+                            )
                         intent = OperatorIntent(
                             command_text=self.command_text,
                             target_crop="pomegranate",
                             dose_volume_ml=self.dose_ml,
                             min_confidence=0.80,
                         )
-                        if vision_for_s2 is not None and vision_for_s2.is_pomegranate:
-                            auth = self.brain.evaluate_dosing_decision(
-                                intent, vision_for_s2,
-                                tree_id=self.tree_idx + 1, frame_id=self._frame_seq,
-                            )
-                        else:
-                            # Synthetic MuJoCo tree fallback when YOLO hasn't locked a synthetic fruit
-                            auth = DosingAuthorization(
-                                authorized=True,
-                                dose_volume_ml=self.dose_ml,
-                                pulse_duration_seconds=round(self.dose_ml / 250.0, 3),
-                                target_coordinates_m=(0.0, 0.72, -0.35),
-                                decision_reasoning=f"Tree #{self.tree_idx + 1} verified at stop.",
-                                crop_verified=True,
-                                confidence_score=max(0.82, self.last_conf),
-                                slm_backend=self.brain.backend,
-                                frame_id=self._frame_seq,
-                                tree_id=self.tree_idx + 1,
-                            )
+                        field_ctx = self.memory_store.get_field_summary("F01")
+                        auth = self.decision_maker.evaluate(
+                            intent,
+                            vision_for_s2,
+                            crop_record=crec,
+                            field_context=field_ctx,
+                            frame_id=self._frame_seq,
+                        )
+                        # Align tree_id binding to integer tree index for sim gate checks
+                        auth.tree_id = self.tree_idx + 1
                         self._active_auth = auth
                         if auth.is_valid(tree_id=self.tree_idx + 1, ttl_s=6.0):
                             self.phase = "EXTEND_POUR"
@@ -410,9 +587,12 @@ class LiveOrchardSimEngine:
                         else:
                             self.trees_skipped += 1
                             self.tree_statuses[self.tree_idx] = "skipped"
+                            if cid and self.planner:
+                                self.planner.mark_outcome(cid, "REJECTED", auth.decision_reasoning)
+                                self._export_field_geojson_locked()
                             self._add_audit_row(self.tree_idx + 1, "Skipped", 0.0, self._ibvs_error_cm, "S2 reject", auth.confidence_score)
                             self.controller.log_outcome("Unverified", auth.confidence_score, 0.0, 0.0, status="REJECTED")
-                            self._log(f"[SKIP] Tree #{self.tree_idx + 1}: {auth.decision_reasoning}")
+                            self._log(f"[SKIP] {cid or f'Tree #{self.tree_idx + 1}'}: {auth.decision_reasoning}")
                             self.phase = "RETRACT"
                             self.phase_timer = 0
                 elif self.phase == "EXTEND_POUR":
@@ -464,18 +644,43 @@ class LiveOrchardSimEngine:
                             self.trees_poured += 1
                             self.tree_statuses[self.tree_idx] = "poured"
                             self.tree_doses[self.tree_idx] = tel.measured_flow_ml
+                            cid = self.tree_crop_ids[self.tree_idx] if self.tree_idx < len(self.tree_crop_ids) else None
+                            if cid:
+                                crec = self.memory_store.get(cid)
+                                if crec:
+                                    stage_str = crec.growth_stage.value
+                                    fert = self.knowledge.get_recommended_fertilizer(stage_str)
+                                    crec.record_dose(DoseEvent(
+                                        timestamp=datetime.now(timezone.utc).isoformat(),
+                                        dose_ml=tel.measured_flow_ml,
+                                        fertilizer_type=fert,
+                                        outcome="COMPLETED",
+                                        gates_passed=f"{passed_cnt}/4",
+                                        ibvs_error_cm=self._ibvs_error_cm,
+                                        s2_confidence=self._active_auth.confidence_score if self._active_auth else self.last_conf,
+                                        s2_reasoning=self._active_auth.decision_reasoning if self._active_auth else "",
+                                        growth_stage_at_dose=stage_str,
+                                    ))
+                                    self.memory_store.save(crec)
+                                if self.planner:
+                                    self.planner.mark_outcome(cid, "DOSED")
+                                self._export_field_geojson_locked()
                             self._add_audit_row(
                                 self.tree_idx + 1, "Completed", tel.measured_flow_ml,
                                 self._ibvs_error_cm, f"{passed_cnt}/4",
                                 self._active_auth.confidence_score if self._active_auth else self.last_conf,
                             )
-                            self._log(f"[POUR] Tree #{self.tree_idx + 1}: {tel.measured_flow_ml:.1f} mL @ 12.5cm (err {self._ibvs_error_cm:.1f}cm).")
+                            self._log(f"[POUR] {cid or f'Tree #{self.tree_idx + 1}'}: {tel.measured_flow_ml:.1f} mL @ 12.5cm (err {self._ibvs_error_cm:.1f}cm).")
                             self.phase = "RETRACT"
                             self.phase_timer = 0
                     elif t_sec >= self.T_POUR_MAX and not self._ibvs_aligned:
                         self.trees_skipped += 1
                         self.tree_statuses[self.tree_idx] = "skipped"
                         self.gate_summary = "G2 FAIL"
+                        cid = self.tree_crop_ids[self.tree_idx] if self.tree_idx < len(self.tree_crop_ids) else None
+                        if cid and self.planner:
+                            self.planner.mark_outcome(cid, "IBVS_TIMEOUT")
+                            self._export_field_geojson_locked()
                         self._add_audit_row(
                             self.tree_idx + 1, "Skipped", 0.0, self._ibvs_error_cm, "G2 fail",
                             self._active_auth.confidence_score if self._active_auth else self.last_conf,
@@ -484,7 +689,7 @@ class LiveOrchardSimEngine:
                             "Pomegranate (Punica granatum)", self.last_conf, 0.0, 0.0,
                             status="SKIPPED_NO_CONVERGE",
                         )
-                        self._log(f"[SKIP] Tree #{self.tree_idx + 1}: Servo did not converge ({self._ibvs_error_cm:.1f}cm).")
+                        self._log(f"[SKIP] {cid or f'Tree #{self.tree_idx + 1}'}: Servo did not converge ({self._ibvs_error_cm:.1f}cm).")
                         self.phase = "RETRACT"
                         self.phase_timer = 0
                 elif self.phase == "RETRACT":
@@ -538,6 +743,15 @@ class LiveOrchardSimEngine:
         vision = self._last_vision
         self.last_conf = vision.confidence
         self.last_s1_ms = vision.inference_ms
+        if self._frame_seq % 15 == 0 and vision.is_pomegranate and self.tree_idx < len(self.tree_x_targets):
+            tx = self.tree_x_targets[self.tree_idx]
+            self.crop_registry.register_or_update(
+                position_3d_m=(round(tx + 0.2, 2), 0.72, 0.0),
+                detections=vision.all_detections,
+                frame_id=self._frame_seq,
+                row_id="R01",
+                confidence=vision.confidence,
+            )
         trunk_boxes = [(*d.bbox_xyxy, d.confidence) for d in vision.all_detections if d.class_name == "trunk_base"]
         t_state = self.tracker.update(vision.is_pomegranate, vision.trunk_base_pixel, trunk_boxes=trunk_boxes)
         vision.trunk_base_pixel = t_state["stabilized_px"]

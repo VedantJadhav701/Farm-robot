@@ -1,0 +1,528 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "crop": "pomegranate",
+    "scientific_name": "Punica granatum",
+    "family": "Lythraceae",
+    "common_names": ["Anar", "Dalimb", "Pomegranate", "Granada"],
+    "origin": "Iran to northern India",
+    "primary_growing_regions": [
+      "Maharashtra (India) — Solapur, Nashik, Sangli, Ahmednagar",
+      "Karnataka (India) — Bagalkot, Bijapur, Bellary",
+      "Andhra Pradesh, Rajasthan, Gujarat",
+      "Iran, Turkey, Spain, USA (California, Arizona), Israel"
+    ],
+    "top_varieties_india": [
+      {"name": "Bhagwa (Sinduri)", "characteristics": "Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown", "fruit_weight_g": "250-350", "maturity_days": "150-180"},
+      {"name": "Ganesh", "characteristics": "Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible", "fruit_weight_g": "200-300", "maturity_days": "140-160"},
+      {"name": "Mridula", "characteristics": "Deep red, medium-hard seeds, 16-20 Brix", "fruit_weight_g": "200-280", "maturity_days": "140-170"},
+      {"name": "Super Bhagwa", "characteristics": "Improved Bhagwa, larger fruits, more uniform", "fruit_weight_g": "300-450", "maturity_days": "160-190"},
+      {"name": "Arakta", "characteristics": "Blood-red arils, hard seeds, good keeping quality", "fruit_weight_g": "250-300", "maturity_days": "150-170"},
+      {"name": "Ruby", "characteristics": "Red rind, red arils, 14-16 Brix", "fruit_weight_g": "200-250", "maturity_days": "140-160"},
+      {"name": "Phule Arakta", "characteristics": "NRC Solapur release, tolerant to bacterial blight", "fruit_weight_g": "250-350", "maturity_days": "150-180"}
+    ]
+  },
+
+  "phenology": {
+    "description": "Pomegranate is a deciduous to semi-evergreen tree/large shrub. Under Indian conditions, it can bear fruit 2-3 times a year with regulated cropping through stress-induced dormancy (bahar treatment).",
+    "bahar_system": {
+      "description": "Bahar is a unique pomegranate cropping system practiced in India. Trees are stressed (water withheld + leaf stripping) to synchronize flowering.",
+      "types": {
+        "ambe_bahar": {
+          "flowering": "Jan-Feb",
+          "harvest": "Jun-Aug",
+          "advantages": "Best fruit quality, highest yield, less bacterial blight",
+          "disadvantages": "Fruit susceptible to sun-scorch in some regions",
+          "recommended_regions": "Maharashtra, Karnataka, Andhra Pradesh"
+        },
+        "mrig_bahar": {
+          "flowering": "Jun-Jul",
+          "harvest": "Nov-Jan",
+          "advantages": "Rain-fed areas, natural monsoon watering",
+          "disadvantages": "High bacterial blight risk during monsoon flowering",
+          "recommended_regions": "Irrigated areas only if disease can be managed"
+        },
+        "hasta_bahar": {
+          "flowering": "Sep-Oct",
+          "harvest": "Feb-Mar",
+          "advantages": "Winter fruit fetches premium price, low disease pressure",
+          "disadvantages": "Lower yield, needs irrigation, frost risk in north India",
+          "recommended_regions": "Rajasthan, Gujarat, parts of Maharashtra"
+        }
+      },
+      "bahar_treatment_protocol": {
+        "step_1_stress": "Withhold irrigation for 30-45 days after last harvest",
+        "step_2_ethrel": "Apply Ethrel 1500-2000 ppm spray for uniform defoliation (optional)",
+        "step_3_leaf_stripping": "Manual removal of remaining leaves",
+        "step_4_rest": "Allow tree to rest 15-20 days (bare canopy)",
+        "step_5_resume_irrigation": "Resume drip irrigation + apply basal fertilizer dose",
+        "step_6_flowering": "New shoots and flower buds emerge in 20-30 days"
+      }
+    },
+    "growth_stages": {
+      "rest_pruning": {
+        "duration_days": "30-45",
+        "description": "Dormancy period after bahar treatment. No leaves. Minimal metabolic activity.",
+        "visual_cues": ["Bare branches", "No leaves", "Dry appearance"],
+        "irrigation": "Withheld completely",
+        "fertilizer": "None — tree is resting",
+        "robot_action": "SKIP — no dosing during rest"
+      },
+      "vegetative": {
+        "duration_days": "20-35",
+        "description": "New shoot flush after dormancy break. Rapid vegetative growth. Critical nitrogen window.",
+        "visual_cues": ["Fresh green shoots", "Small tender leaves", "No flowers yet", "Light canopy"],
+        "irrigation": "Resume drip — 15-20 L/tree/day",
+        "fertilizer": {
+          "primary": "NPK 19:19:19",
+          "dose_ml_per_tree": 100,
+          "frequency_days": 15,
+          "secondary": ["Zinc sulfate 0.5%", "Ferrous sulfate 0.5%"],
+          "notes": "High nitrogen for canopy development. Apply through drip/fertigate."
+        },
+        "robot_action": "DOSE — standard NPK fertigation"
+      },
+      "flowering": {
+        "duration_days": "25-35",
+        "description": "Flower bud initiation to full bloom. CRITICAL stage — nitrogen must be reduced to promote fruit set over vegetative growth.",
+        "visual_cues": ["Red-orange tubular flowers", "Mixed buds and blooms", "Pollinators active"],
+        "types_of_flowers": {
+          "hermaphrodite_vase": "Productive — forms fruit. Bell/vase shaped. Keep these.",
+          "male_tubular": "Non-productive — falls off. Narrow tubular shape.",
+          "intermediate": "Partially productive, may set small fruit."
+        },
+        "irrigation": "Reduce to 10-15 L/tree/day — slight stress improves fruit set",
+        "fertilizer": {
+          "primary": "NPK 0:52:34 (Mono Potassium Phosphate)",
+          "dose_ml_per_tree": 80,
+          "frequency_days": 10,
+          "secondary": ["Boron 0.2% spray (fruit set)", "Calcium Nitrate 0.5% spray"],
+          "avoid": "AVOID high nitrogen — causes flower drop and excessive vegetative growth",
+          "notes": "Boron is CRITICAL for pollen viability and fruit set. Calcium prevents cracking."
+        },
+        "robot_action": "DOSE — phosphorus + potassium + boron, NO nitrogen"
+      },
+      "fruiting": {
+        "duration_days": "60-90",
+        "description": "Fruit development from set to maturity. Longest stage. Fruits grow rapidly. High potassium demand.",
+        "sub_stages": {
+          "fruit_set": {"days": "0-15", "description": "Ovary swelling, petal fall, small green fruit visible"},
+          "fruit_development": {"days": "15-60", "description": "Rapid cell division and expansion. Fruit turns from green to straw-yellow."},
+          "fruit_maturation": {"days": "60-90", "description": "Color development. Rind hardens. Sugar accumulation. Aril color deepens."}
+        },
+        "visual_cues": ["Green to yellow-pink fruits", "Increasing fruit size", "Dense canopy with fruit load"],
+        "irrigation": "Full — 25-30 L/tree/day. Consistent moisture critical to prevent cracking.",
+        "fertilizer": {
+          "primary": "NPK 13:0:45 (Potassium Nitrate)",
+          "dose_ml_per_tree": 120,
+          "frequency_days": 12,
+          "secondary": [
+            "Calcium Chloride 1% spray every 15 days (prevents cracking)",
+            "Zinc sulfate 0.3%",
+            "Sulphate of Potash (K2SO4) 0.5% spray"
+          ],
+          "notes": "High potassium for fruit sizing and sugar accumulation. Calcium prevents fruit cracking — the #1 quality problem."
+        },
+        "robot_action": "DOSE — high potassium + calcium"
+      },
+      "harvest_ready": {
+        "duration_days": "15-25",
+        "description": "Fruit approaching harvest maturity. Color fully developed. Reduce fertilizer and water to improve sugar concentration and storage life.",
+        "visual_cues": ["Full red/pink rind color (variety dependent)", "Metallic sound when tapped", "Calyx closing/drying", "Minor rind cracking in over-mature fruit"],
+        "harvest_indices": {
+          "brix": "16-20 for Bhagwa, 14-16 for Ganesh",
+          "acidity": "0.5-0.8%",
+          "rind_color": "Uniform red-pink (Bhagwa) or pinkish-white (Ganesh)",
+          "sound_test": "Metallic ring when tapped = mature",
+          "days_from_flowering": "150-180 (Bhagwa)"
+        },
+        "irrigation": "Reduce to 10-12 L/tree/day — 15 days before harvest",
+        "fertilizer": {
+          "primary": "K2SO4 (Sulphate of Potash) only",
+          "dose_ml_per_tree": 50,
+          "frequency_days": 20,
+          "avoid": "AVOID nitrogen — delays maturity, reduces sugar, promotes vegetative flush",
+          "notes": "Minimal fertigation. Focus on color and sugar."
+        },
+        "robot_action": "DOSE — minimal potassium only. Flag harvest-ready for picking team."
+      },
+      "post_harvest": {
+        "duration_days": "15-30",
+        "description": "After fruit removal. Recovery feeding before next bahar treatment.",
+        "visual_cues": ["Harvested tree — reduced fruit load", "Some remaining fruits", "Aging leaves"],
+        "irrigation": "Maintain 15-20 L/tree/day until stress period begins",
+        "fertilizer": {
+          "primary": "NPK 19:19:19 + organic manure (FYM 25-30 kg/tree basin)",
+          "dose_ml_per_tree": 100,
+          "frequency_days": 15,
+          "secondary": ["Zinc sulfate 0.5%", "Micronutrient mix"],
+          "notes": "Replenish tree reserves. Apply FYM/compost to basin. Last chance before rest."
+        },
+        "robot_action": "DOSE — balanced NPK + flag for FYM application by field crew"
+      }
+    }
+  },
+
+  "diseases": {
+    "bacterial_blight": {
+      "pathogen": "Xanthomonas axonopodis pv. punicae",
+      "severity": "critical",
+      "prevalence": "Most devastating disease of pomegranate in India — can destroy 60-80% of crop",
+      "visual_symptoms": [
+        "Oily water-soaked spots on leaves (early)",
+        "Dark brown to black irregular lesions on leaves",
+        "L-shaped or Y-shaped cracking on fruit rind",
+        "Cankers on twigs and branches",
+        "Gummy exudate from infected bark",
+        "Premature fruit drop"
+      ],
+      "favorable_conditions": "High humidity >80%, temperatures 25-35°C, monsoon season, dense canopy",
+      "action": "SKIP_DOSING",
+      "treatment": {
+        "chemical": [
+          "Copper hydroxide (Kocide 3000) 2 g/L spray",
+          "Streptomycin sulfate 500 ppm + Copper oxychloride 2.5 g/L",
+          "Kasugamycin (Kasu-B) 3 ml/L — most effective new-generation",
+          "2-Bromo-2-nitro-propane-1,3-diol (Bronopol) 1 g/L"
+        ],
+        "cultural": [
+          "Prune and burn infected branches (10-15 cm below canker)",
+          "Avoid overhead irrigation",
+          "Open canopy by thinning — improve air circulation",
+          "Avoid mrig bahar in endemic areas — switch to ambe/hasta bahar",
+          "Sanitize pruning tools with 1% sodium hypochlorite"
+        ]
+      },
+      "robot_decision": "If bacterial_blight is flagged: REJECT dosing (liquid on wet canopy spreads inoculum). Log severity. Alert operator. Skip tree."
+    },
+    "cercospora_leaf_spot": {
+      "pathogen": "Cercospora punicae / Pseudocercospora punicae",
+      "severity": "medium",
+      "visual_symptoms": [
+        "Small circular dark brown spots on leaves (2-5 mm)",
+        "Yellow halo around spots",
+        "Premature defoliation in severe cases"
+      ],
+      "favorable_conditions": "Warm humid weather, dense canopy",
+      "action": "DOSE_WITH_CAUTION",
+      "treatment": {
+        "chemical": ["Mancozeb 75% WP (2.5 g/L)", "Carbendazim 50% WP (1 g/L)", "Hexaconazole 5% EC (1 ml/L)"],
+        "cultural": ["Remove fallen infected leaves", "Open up canopy"]
+      },
+      "robot_decision": "ALLOW dosing but log disease flag. Recommend fungicide spray to operator."
+    },
+    "alternaria_fruit_rot": {
+      "pathogen": "Alternaria alternata",
+      "severity": "medium-high",
+      "visual_symptoms": [
+        "Black heart — internal fruit rot not visible outside",
+        "Slight discoloration at calyx end",
+        "Fruit feels lighter than normal",
+        "Cut fruit shows brown-black aril decay"
+      ],
+      "action": "DOSE_WITH_CAUTION",
+      "treatment": {
+        "chemical": ["Propineb 70% WP (2.5 g/L)", "Hexaconazole 5% EC (1 ml/L) at flowering"],
+        "cultural": ["Avoid fruit injury", "Harvest at proper maturity"]
+      },
+      "robot_decision": "ALLOW dosing. Log suspicion. Cannot detect black heart from camera — flag for manual inspection."
+    },
+    "anthracnose": {
+      "pathogen": "Colletotrichum gloeosporioides",
+      "severity": "medium",
+      "visual_symptoms": [
+        "Small dark sunken spots on fruit rind",
+        "Spots enlarge with concentric rings",
+        "Pinkish-orange spore masses in wet weather",
+        "Leaf blight with irregular brown patches"
+      ],
+      "action": "DOSE_WITH_CAUTION",
+      "treatment": {
+        "chemical": ["Carbendazim 1 g/L", "Thiophanate-methyl 1 g/L", "Azoxystrobin 1 ml/L"]
+      },
+      "robot_decision": "ALLOW dosing. Log disease flag."
+    },
+    "wilt": {
+      "pathogen": "Ceratocystis fimbriata / Fusarium spp.",
+      "severity": "critical",
+      "visual_symptoms": [
+        "Sudden wilting of one or more branches",
+        "Brown discoloration of vascular tissue (cut stem to check)",
+        "Complete tree death in 2-3 weeks if untreated",
+        "Gummy exudate from trunk base"
+      ],
+      "action": "SKIP_DOSING",
+      "treatment": {
+        "chemical": [
+          "Carbendazim 2 g/L soil drench (early stage only)",
+          "Trichoderma viride 50 g/tree basin — biocontrol"
+        ],
+        "cultural": [
+          "Remove and burn dead trees immediately",
+          "Do not replant in same pit for 2 years",
+          "Avoid flooding/waterlogging",
+          "Soil solarization of affected basin"
+        ]
+      },
+      "robot_decision": "If wilt detected: REJECT dosing. Mark tree as DEAD/DYING. Alert operator IMMEDIATELY. High priority."
+    },
+    "fruit_cracking": {
+      "cause": "Physiological — not pathogen. Caused by irregular irrigation, calcium deficiency, or sudden rain after drought.",
+      "severity": "high (economic — cracked fruit is unsellable)",
+      "visual_symptoms": [
+        "Longitudinal or radial cracks on fruit rind",
+        "Exposed arils attract secondary infections and fruit flies"
+      ],
+      "action": "DOSE_WITH_CAUTION",
+      "treatment": {
+        "preventive": [
+          "Consistent drip irrigation — no drought-then-flood cycles",
+          "CaCl2 1% spray every 15 days from fruit set",
+          "Mulching to maintain soil moisture",
+          "GA3 (Gibberellic acid) 25 ppm spray at pea stage"
+        ]
+      },
+      "robot_decision": "ALLOW dosing. Add calcium to dose if cracking detected. Log severity."
+    }
+  },
+
+  "pests": {
+    "fruit_borer": {
+      "organism": "Deudorix (Virachola) isocrates (Anar Butterfly / Pomegranate Fruit Borer)",
+      "severity": "high",
+      "description": "Most serious pest. Larva bores into developing fruit through calyx. Causes fruit rot, secondary fungal infection, and total fruit loss.",
+      "visual_symptoms": [
+        "Entry hole near calyx end (covered with frass)",
+        "Frass (excrement) on fruit surface",
+        "Fruit becomes soft, discolored",
+        "Adult butterflies hovering near flowers/young fruits"
+      ],
+      "treatment": {
+        "chemical": ["Emamectin benzoate 5% SG (0.4 g/L)", "Spinosad 45% SC (0.3 ml/L)", "Chlorantraniliprole 18.5% SC (0.3 ml/L)"],
+        "biological": ["Trichogramma chilonis egg parasitoid release (50,000/ha)", "Bt (Bacillus thuringiensis) 2 g/L spray", "Neem oil 5 ml/L at flowering"],
+        "cultural": ["Calyx-end bagging of fruits after fruit set", "Pheromone traps for adult monitoring", "Remove and destroy fallen/infested fruits"]
+      },
+      "robot_decision": "ALLOW dosing. Log pest flag. Alert for pest management spray schedule."
+    },
+    "mealybug": {
+      "organism": "Ferrisia virgata / Maconellicoccus hirsutus",
+      "severity": "medium-high",
+      "visual_symptoms": [
+        "White cottony masses on twigs, leaves, fruits",
+        "Sooty mold on honeydew deposits",
+        "Stunted growth, leaf curling"
+      ],
+      "treatment": {
+        "chemical": ["Buprofezin 25% SC (1.5 ml/L)", "Thiamethoxam 25% WG (0.3 g/L)"],
+        "biological": ["Cryptolaemus montrouzieri (Australian ladybug) release — 10/tree"]
+      },
+      "robot_decision": "ALLOW dosing. Log pest flag. Avoid excess nitrogen (feeds mealybug population)."
+    },
+    "thrips": {
+      "organism": "Scirtothrips dorsalis / Rhipiphorothrips cruentatus",
+      "severity": "medium",
+      "visual_symptoms": [
+        "Scarring and russeting on fruit rind",
+        "Silvery streaks on young leaves",
+        "Curling and browning of leaf margins"
+      ],
+      "treatment": {
+        "chemical": ["Fipronil 5% SC (1.5 ml/L)", "Spinetoram 11.7% SC (0.5 ml/L)"]
+      },
+      "robot_decision": "ALLOW dosing. Log pest flag."
+    },
+    "stem_borer": {
+      "organism": "Coelosterna scabrator",
+      "severity": "medium-high",
+      "visual_symptoms": [
+        "Bore holes in trunk and thick branches",
+        "Sawdust-like frass at bore holes",
+        "Wilting of branches above bore site"
+      ],
+      "treatment": {
+        "chemical": ["Inject Dichlorvos 76% EC (5 ml/L) into bore hole + seal with mud"],
+        "cultural": ["Kill grubs with wire probe", "Apply lime + copper sulfate paste to trunk"]
+      },
+      "robot_decision": "ALLOW dosing but flag trunk damage. Alert operator."
+    }
+  },
+
+  "nutrient_management": {
+    "annual_requirement_per_tree": {
+      "note": "For a mature bearing tree (4+ years), drip-fertigated",
+      "nitrogen_N_g": "500-625",
+      "phosphorus_P2O5_g": "250-375",
+      "potassium_K2O_g": "500-625",
+      "farmyard_manure_kg": "25-30",
+      "total_water_soluble_fertilizer_kg": "2.5-3.5"
+    },
+    "deficiency_symptoms": {
+      "nitrogen": {
+        "visual": ["Uniform yellowing (chlorosis) of older leaves first", "Stunted growth", "Small fruits"],
+        "correction": "Urea 1% spray or NPK 19:19:19 fertigation"
+      },
+      "phosphorus": {
+        "visual": ["Purple/bronze discoloration of older leaves", "Poor root development", "Delayed flowering"],
+        "correction": "Mono Ammonium Phosphate (MAP 12:61:0) 3 g/L fertigation"
+      },
+      "potassium": {
+        "visual": ["Marginal leaf scorch (brown edges) on older leaves", "Poor fruit color", "Fruit cracking"],
+        "correction": "Sulphate of Potash (SOP) 5 g/L or MKP 0:52:34 fertigation"
+      },
+      "calcium": {
+        "visual": ["Young leaf distortion", "Fruit cracking", "Blossom-end-rot-like symptoms"],
+        "correction": "Calcium Nitrate 0.5% foliar spray + CaCl2 1% at fruit development"
+      },
+      "iron": {
+        "visual": ["Interveinal chlorosis on new/young leaves (green veins, yellow lamina)", "Occurs in calcareous soils"],
+        "correction": "FeSO4 0.5% foliar or Fe-EDDHA chelate in drip"
+      },
+      "zinc": {
+        "visual": ["Small clustered leaves (rosetting)", "Interveinal chlorosis on new leaves"],
+        "correction": "ZnSO4 0.5% foliar spray"
+      },
+      "boron": {
+        "visual": ["Poor fruit set", "Misshapen fruit", "Internal browning", "Corky areas in fruit"],
+        "correction": "Borax 0.2% spray at flowering and fruit set stage"
+      }
+    },
+    "fertigation_schedule_bhagwa": {
+      "note": "Split across growth stages via drip. Adjust for soil test results.",
+      "vegetative_30pct": {
+        "NPK_ratio": "19:19:19 or Urea + MAP + MOP",
+        "share_of_annual": "30%",
+        "frequency": "Every 15 days"
+      },
+      "flowering_20pct": {
+        "NPK_ratio": "0:52:34 (MKP) + Boron",
+        "share_of_annual": "20%",
+        "frequency": "Every 10 days"
+      },
+      "fruiting_40pct": {
+        "NPK_ratio": "13:0:45 (KNO3) + CaCl2 spray",
+        "share_of_annual": "40%",
+        "frequency": "Every 10-12 days"
+      },
+      "harvest_maturity_10pct": {
+        "NPK_ratio": "K2SO4 only",
+        "share_of_annual": "10%",
+        "frequency": "Every 20 days"
+      }
+    }
+  },
+
+  "soil_and_water": {
+    "ideal_soil": {
+      "type": "Well-drained sandy loam to loamy",
+      "pH": "6.5-7.5 (tolerates up to 8.0)",
+      "EC_dS_m": "<2.0 (sensitive to salinity above this)",
+      "organic_carbon_pct": ">0.5%",
+      "CaCO3_pct": "<15% (high lime locks up iron and zinc)"
+    },
+    "water_requirement": {
+      "annual_liters_per_tree": "8000-15000 (varies by climate and tree age)",
+      "drip_recommendation": "2 drippers x 4 L/hr per tree, 2-4 hours/day depending on stage",
+      "critical_periods": ["Flowering (reduce slightly)", "Fruit development (consistent — no stress cycles)", "Pre-harvest (reduce)"]
+    },
+    "irrigation_schedule_by_stage": {
+      "rest": "No irrigation for 30-45 days",
+      "vegetative": "15-20 L/tree/day",
+      "flowering": "10-15 L/tree/day (slight stress = better fruit set)",
+      "fruiting": "25-30 L/tree/day (most critical — cracking if inconsistent)",
+      "harvest_ready": "10-12 L/tree/day (reduce 15 days before harvest)"
+    }
+  },
+
+  "economics": {
+    "yield_per_tree_kg": {
+      "3rd_year": "5-8",
+      "4th_year": "10-15",
+      "5th_year_onward": "15-25",
+      "peak_7th_to_15th_year": "25-40"
+    },
+    "market_grade_india": {
+      "super": {"fruit_weight_g": ">350", "color": "Uniform dark red", "brix": ">18", "cracks": "None"},
+      "A_grade": {"fruit_weight_g": "250-350", "color": "Red", "brix": "16-18", "cracks": "None"},
+      "B_grade": {"fruit_weight_g": "200-250", "color": "Pinkish", "brix": "14-16", "cracks": "Minor"},
+      "reject": {"fruit_weight_g": "<200 or cracked/spotted/borer-damaged"}
+    },
+    "approximate_prices_INR_per_kg_2024": {
+      "super": "150-250",
+      "A_grade": "80-150",
+      "B_grade": "40-80",
+      "export_grade": "200-400"
+    }
+  },
+
+  "robot_decision_rules": {
+    "description": "Hard-coded rules the SLM must enforce in every decision.",
+    "rules": [
+      {"id": "R01", "rule": "NEVER dose during rest_pruning stage — tree is dormant", "severity": "hard_reject"},
+      {"id": "R02", "rule": "NEVER dose if bacterial_blight is detected — liquid spreads inoculum", "severity": "hard_reject"},
+      {"id": "R03", "rule": "NEVER dose if wilt is detected — tree may be dying", "severity": "hard_reject"},
+      {"id": "R04", "rule": "NEVER dose if tree was already dosed today (same crop_id)", "severity": "hard_reject"},
+      {"id": "R05", "rule": "REJECT if vision confidence < 0.80", "severity": "hard_reject"},
+      {"id": "R06", "rule": "REJECT if target_crop != pomegranate", "severity": "hard_reject"},
+      {"id": "R07", "rule": "During flowering: use P+K fertilizer ONLY — NO nitrogen", "severity": "hard_reject"},
+      {"id": "R08", "rule": "During fruiting: add calcium spray recommendation if fruit_cracking detected", "severity": "advisory"},
+      {"id": "R09", "rule": "Max dose 500 mL per tree per application", "severity": "hard_clamp"},
+      {"id": "R10", "rule": "Min dose 10 mL per tree", "severity": "hard_clamp"},
+      {"id": "R11", "rule": "If fruit_borer detected: allow dosing but flag for pest management", "severity": "advisory"},
+      {"id": "R12", "rule": "If health_score < 0.3: skip dosing, flag for manual expert inspection", "severity": "hard_reject"},
+      {"id": "R13", "rule": "Adjust dose by growth stage: use the stage-specific protocol from dosing_protocols", "severity": "recommended"},
+      {"id": "R14", "rule": "If >3 consecutive trees skipped in a row: alert operator — possible systemic issue", "severity": "advisory"}
+    ]
+  },
+
+  "dosing_protocols": {
+    "vegetative": {
+      "dose_ml": 100,
+      "fertilizer": "NPK 19:19:19",
+      "frequency_days": 15,
+      "notes": "Promote canopy growth. Full NPK.",
+      "nitrogen_allowed": true
+    },
+    "flowering": {
+      "dose_ml": 80,
+      "fertilizer": "NPK 0:52:34 (MKP) + Boron",
+      "frequency_days": 10,
+      "notes": "Promote fruit set. ZERO nitrogen. Boron critical.",
+      "nitrogen_allowed": false
+    },
+    "fruiting": {
+      "dose_ml": 120,
+      "fertilizer": "NPK 13:0:45 (KNO3)",
+      "frequency_days": 12,
+      "notes": "Fruit sizing. High potassium. Add calcium spray.",
+      "nitrogen_allowed": true
+    },
+    "harvest_ready": {
+      "dose_ml": 50,
+      "fertilizer": "K2SO4 (Sulphate of Potash) only",
+      "frequency_days": 20,
+      "notes": "Color and sugar. Minimal input. No nitrogen.",
+      "nitrogen_allowed": false
+    },
+    "post_harvest": {
+      "dose_ml": 100,
+      "fertilizer": "NPK 19:19:19 + organic manure recommendation",
+      "frequency_days": 15,
+      "notes": "Replenish reserves. Last window before rest.",
+      "nitrogen_allowed": true
+    },
+    "rest_pruning": {
+      "dose_ml": 0,
+      "fertilizer": "NONE",
+      "frequency_days": 0,
+      "notes": "NO dosing during dormancy.",
+      "nitrogen_allowed": false
+    },
+    "default": {
+      "dose_ml": 80,
+      "fertilizer": "NPK 19:19:19",
+      "frequency_days": 15,
+      "notes": "General maintenance — when growth stage is unknown.",
+      "nitrogen_allowed": true
+    }
+  }
+}

@@ -29,6 +29,9 @@ from src.control.kinematics import ArmKinematics
 from src.control.fertilizer_controller import FertilizerDosingController
 from src.hardware.ros2_actuator_bridge import ROS2ActuatorBridge, SafetyTelemetry
 from src.sim.live_sim_engine import LiveOrchardSimEngine
+from src.memory import CropMemoryStore, CropStatus
+from src.memory.field_map import FieldMap, MissionPlanner
+from src.brain import PomegranateKnowledgeBase
 
 app = FastAPI(
     title="Physical AI Pomegranate Dual-Brain API",
@@ -337,3 +340,184 @@ def sim_asset(filename: str):
     if not p.exists():
         raise HTTPException(status_code=404, detail="Asset not generated yet")
     return FileResponse(str(p))
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PERSISTENT CROP MEMORY, FIELD MAP & AGRONOMY KNOWLEDGE API
+# ═══════════════════════════════════════════════════════════════
+
+def _get_memory_and_kb():
+    if "sim_engine" in _state:
+        eng = _state["sim_engine"]
+        return eng.memory_store, eng.field_map, eng.planner, eng.knowledge
+    if "memory_store" not in _state:
+        _state["memory_store"] = CropMemoryStore(
+            db_path="output/crop_memory.db", json_dir="output/crop_records"
+        )
+        _state["knowledge_kb"] = PomegranateKnowledgeBase(
+            kb_path="data/knowledge/pomegranate_kb.json"
+        )
+        _state["field_map"] = FieldMap.from_tree_positions(
+            "F01", [1.20, 3.00, 4.80, 6.60, 8.40, 10.20, 12.00, 13.80]
+        )
+        _state["planner"] = MissionPlanner(_state["field_map"], _state["memory_store"])
+        _state["planner"].plan_mission("row_sequential")
+    return _state["memory_store"], _state["field_map"], _state["planner"], _state["knowledge_kb"]
+
+
+class MissionPlanRequest(BaseModel):
+    strategy: Literal["row_sequential", "priority_health"] = "row_sequential"
+
+
+class KnowledgeQueryRequest(BaseModel):
+    question: str = Field(..., min_length=2, max_length=500)
+    crop_id: Optional[str] = None
+
+
+@app.get("/field-map")
+def get_field_map(field_id: str = "F01"):
+    mem, fmap, _, _ = _get_memory_and_kb()
+    crops = mem.get_all_by_field(field_id)
+    return {
+        "field_map": fmap.model_dump(),
+        "geojson": fmap.to_geojson(crops),
+        "summary": mem.get_field_summary(field_id),
+    }
+
+
+@app.get("/field-map/summary")
+def get_field_summary(field_id: str = "F01"):
+    mem, _, _, _ = _get_memory_and_kb()
+    return mem.get_field_summary(field_id)
+
+
+@app.get("/crops")
+def list_crops(
+    field_id: str = "F01",
+    status: Optional[str] = None,
+    row: Optional[str] = None,
+):
+    mem, _, _, _ = _get_memory_and_kb()
+    crops = mem.get_all_by_field(field_id)
+    if status:
+        crops = [c for c in crops if c.status.value == status.lower()]
+    if row:
+        crops = [c for c in crops if c.row_id.upper() == row.upper()]
+    return {"count": len(crops), "crops": [c.model_dump() for c in crops]}
+
+
+@app.get("/crop/{crop_id}")
+def get_crop_record(crop_id: str):
+    mem, _, _, kb = _get_memory_and_kb()
+    rec = mem.get(crop_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail=f"Crop {crop_id} not found")
+    return {
+        "crop": rec.model_dump(),
+        "agro_context": kb.build_context_for_slm(rec),
+    }
+
+
+@app.get("/crop/{crop_id}/history")
+def get_crop_history(crop_id: str):
+    mem, _, _, _ = _get_memory_and_kb()
+    rec = mem.get(crop_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail=f"Crop {crop_id} not found")
+    return {
+        "crop_id": rec.crop_id,
+        "status": rec.status.value,
+        "total_dose_ml": rec.total_dose_ml,
+        "total_doses_count": rec.total_doses_count,
+        "doses_applied": [d.model_dump() for d in rec.doses_applied],
+    }
+
+
+@app.post("/mission/plan")
+def plan_mission(req: MissionPlanRequest):
+    _, _, planner, _ = _get_memory_and_kb()
+    queue = planner.plan_mission(strategy=req.strategy)
+    return {"strategy": req.strategy, "queue": queue, "progress": planner.get_progress()}
+
+
+@app.get("/mission/progress")
+def get_mission_progress():
+    _, _, planner, _ = _get_memory_and_kb()
+    return planner.get_progress()
+
+
+@app.post("/knowledge/query")
+def query_pomegranate_knowledge(req: KnowledgeQueryRequest):
+    mem, _, _, kb = _get_memory_and_kb()
+    q_low = req.question.lower()
+    matched_sections = {}
+
+    for st_key in kb.kb.get("phenology", {}).get("growth_stages", {}):
+        if st_key.replace("_", " ") in q_low or st_key in q_low:
+            matched_sections[f"stage:{st_key}"] = kb.get_dosing_protocol(st_key)
+    for d_key in kb.kb.get("diseases", {}):
+        if d_key.replace("_", " ") in q_low or d_key in q_low:
+            matched_sections[f"disease:{d_key}"] = kb.get_disease_info(d_key)
+    for p_key in kb.kb.get("pests", {}):
+        if p_key.replace("_", " ") in q_low or p_key in q_low:
+            matched_sections[f"pest:{p_key}"] = kb.get_pest_info(p_key)
+    for nut_key in kb.kb.get("nutrient_management", {}).get("deficiency_symptoms", {}):
+        if nut_key in q_low:
+            matched_sections[f"deficiency:{nut_key}"] = kb.get_deficiency_info(nut_key)
+    if "bahar" in q_low:
+        matched_sections["bahar_system"] = kb.kb.get("phenology", {}).get("bahar_system", {})
+    if "variety" in q_low or "varieties" in q_low or "bhagwa" in q_low:
+        matched_sections["varieties"] = kb.kb.get("meta", {}).get("top_varieties_india", [])
+    if not matched_sections:
+        matched_sections["robot_decision_rules"] = kb.get_all_rules()
+
+    crop_ctx = ""
+    if req.crop_id:
+        rec = mem.get(req.crop_id)
+        if rec:
+            crop_ctx = kb.build_context_for_slm(rec)
+
+    brain = None
+    if "sim_engine" in _state:
+        brain = _state["sim_engine"].brain
+    elif "brain" in _state:
+        brain = _state["brain"]
+    else:
+        brain = LLMBrainSupervisor(backend="auto", ollama_model="qwen2.5:3b")
+        _state["brain"] = brain
+
+    slm_answer = None
+    if brain.backend != "rule_fallback":
+        sys_p = (
+            "You are the Pomegranate Agronomy Expert Brain (Punica granatum). "
+            "Answer concisely and accurately using ONLY the provided knowledge context."
+        )
+        usr_p = f"Question: {req.question}\n"
+        if crop_ctx:
+            usr_p += f"Active Crop: {crop_ctx}\n"
+        usr_p += f"Knowledge Context: {matched_sections}"
+        slm_answer = brain._query_slm(sys_p, usr_p)
+
+    # Readable deterministic synthesis when SLM is offline/fallback
+    kb_summary = None
+    if not slm_answer:
+        parts = []
+        for k, v in matched_sections.items():
+            if isinstance(v, dict):
+                if "fertilizer" in v and "dose_ml" in v:
+                    parts.append(f"{k}: {v.get('dose_ml')} mL {v.get('fertilizer')} (every {v.get('frequency_days')}d). {v.get('notes', '')}")
+                elif "action" in v and "treatment" in v:
+                    parts.append(f"{k}: action={v.get('action')}, treatment={v.get('treatment')}")
+                else:
+                    parts.append(f"{k}: {str(v)[:200]}")
+            elif isinstance(v, list):
+                parts.append(f"{k}: {len(v)} entries")
+        kb_summary = " | ".join(parts) if parts else "Matched pomegranate KB."
+
+    return {
+        "question": req.question,
+        "slm_backend": brain.backend,
+        "slm_answer": slm_answer or kb_summary,
+        "crop_context": crop_ctx or None,
+        "matched_kb": matched_sections,
+    }
