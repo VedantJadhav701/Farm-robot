@@ -1,0 +1,64 @@
+{
+  "decision_total": 250,
+  "decision_json_valid_pct": 100.0,
+  "unsafe_total": 136,
+  "safety_veto_recall_pct": 100.0,
+  "safe_total": 114,
+  "safe_auth_accuracy_pct": 100.0,
+  "intent_total": 50,
+  "intent_json_valid_pct": 100.0,
+  "intent_conf_floor_pct": 100.0,
+  "latency_p95_ms": 2085.1,
+  "qa_samples": [
+    {
+      "question": "What is the scientific name, family, and common names of pomegranate?",
+      "expected": "Pomegranate is Punica granatum (family Lythraceae). Common names include Anar, Dalimb, Pomegranate, Granada. Major growing regions: Maharashtra (India) — Solapur, Nashik, Sangli, Ahmednagar; Karnataka (India) — Bagalkot, Bijapur, Bellary; Andhra Pradesh, Rajasthan, Gujarat; Iran, Turkey, Spain, USA (California, Arizona), Israel.",
+      "predicted": "Pomegranate is Punica granatum (family Lythraceae). Common names include Anar, Dalimb, Pomegranate, Granada. Major growing regions: Maharashtra (India) — Solapur, Nashik, Sangli, Ahmednagar; Karnataka (India) — Bagalkot, Bijapur, Bellary; Andhra Pradesh, Rajasthan, Gujarat; Iran, Turkey, Spain, USA (California, Arizona), Israel."
+    },
+    {
+      "question": "Tell me about the Bhagwa (Sinduri) pomegranate variety.",
+      "expected": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days.",
+      "predicted": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days."
+    },
+    {
+      "question": "What are the fruit weight, Brix/characteristics, and maturity days of Bhagwa (Sinduri) pomegranate?",
+      "expected": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days.",
+      "predicted": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days."
+    },
+    {
+      "question": "Bhagwa (Sinduri) anar variety ki visheshta aur maturity days kya hain?",
+      "expected": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days.",
+      "predicted": "Bhagwa (Sinduri): Bright red rind, soft seeds, sweet, 20-28 Brix, most commercially grown. Typical fruit weight is 250-350 g and maturity takes 150-180 days."
+    },
+    {
+      "question": "Tell me about the Ganesh pomegranate variety.",
+      "expected": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days.",
+      "predicted": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days."
+    },
+    {
+      "question": "What are the fruit weight, Brix/characteristics, and maturity days of Ganesh pomegranate?",
+      "expected": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days.",
+      "predicted": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days."
+    },
+    {
+      "question": "Ganesh anar variety ki visheshta aur maturity days kya hain?",
+      "expected": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days.",
+      "predicted": "Ganesh: Pinkish-white rind, soft seeds, 16-18 Brix, disease susceptible. Typical fruit weight is 200-300 g and maturity takes 140-160 days."
+    },
+    {
+      "question": "Tell me about the Mridula pomegranate variety.",
+      "expected": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-280 g and maturity takes 140-170 days.",
+      "predicted": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-280 g and maturity takes 140-170 days."
+    },
+    {
+      "question": "What are the fruit weight, Brix/characteristics, and maturity days of Mridula pomegranate?",
+      "expected": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-280 g and maturity takes 140-170 days.",
+      "predicted": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-300 g and maturity takes 140-170 days."
+    },
+    {
+      "question": "Mridula anar variety ki visheshta aur maturity days kya hain?",
+      "expected": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-280 g and maturity takes 140-170 days.",
+      "predicted": "Mridula: Deep red, medium-hard seeds, 16-20 Brix. Typical fruit weight is 200-300 g and maturity takes 140-170 days."
+    }
+  ]
+}
